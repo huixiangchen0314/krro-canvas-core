@@ -6,17 +6,18 @@
   "创建一个光栅画布 map。"
   [width height bits-per-channel channels & {:keys [color]}]
   (let [color (or color (repeat channels 0.0))
-        size (* width height channels)
+        pixels (* width height)
+        size (* pixels channels)
         arr (case bits-per-channel
               8  (byte-array size)
               16 (short-array size)
               32 (float-array size))
         native-colors (mapv #(util/float->native % bits-per-channel) color)]
     (when (seq color)
-      (dotimes [i (int (/ size channels))]
+      (dotimes [i pixels]
         (let [idx (* i channels)]
           (dotimes [c channels]
-            (let [native (native-colors c)
+            (let  [native (nth native-colors c)
                   b (case bits-per-channel
                       8  (util/int->byte native)
                       16 (util/int->short native)

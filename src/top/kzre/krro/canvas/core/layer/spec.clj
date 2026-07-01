@@ -4,7 +4,7 @@
   (:require [clojure.spec.alpha :as s]))
 
 ;; ── 公共属性（所有图层必须包含） ─────────────────
-(s/def ::id keyword?)
+(s/def ::id keyword?)   ;; 恢复为关键字
 (s/def ::name string?)
 (s/def ::type keyword?)
 (s/def ::opacity (s/and number? #(<= 0.0 % 1.0)))
