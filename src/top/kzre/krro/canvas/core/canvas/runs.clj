@@ -1,63 +1,114 @@
 (ns top.kzre.krro.canvas.core.canvas.runs
-  "游程编码画布创建与读写。简化实现，保证功能完整。"
-  (:require [top.kzre.krro.canvas.core.canvas.raster :as raster]))
+  "游程编码画布创建与读写。
+   8位/16位画布使用对应原生数组存储游程，count 自动分段避免溢出。
+   32位浮点画布使用 int-array 存储游程（通道值用 Float/floatToIntBits 编码）。"
+  (:require [top.kzre.krro.canvas.core.canvas.raster :as raster]
+            [top.kzre.krro.canvas.core.canvas.util :as util])
+  (:import (java.util ArrayList)))
 
-(defn- raster->runs
-  "将光栅像素数组压缩为游程数组。返回对应位深度的数组。"
+;; ── 每通道位数对应的最大游程计数 ──────────────────
+(def ^:private max-run-count
+  {8  127      ;; byte 有符号最大值
+   16 32767    ;; short 有符号最大值
+   32 Integer/MAX_VALUE})
+
+;; ── 压缩：光栅 → 游程 ─────────────────────────────
+(defn raster->runs
   [pixels width height channels bits]
   (let [total (* width height channels)
-        runs (java.util.ArrayList.)]
-    (loop [i 0]
-      (when (< i total)
-        (let [start i
-              chs (mapv #(aget pixels (+ i %)) (range channels))]
-          (loop [j (+ i channels)]
-            (if (and (< j total)
-                     (every? (fn [c] (= (aget pixels (+ j c)) (chs c)))
-                             (range channels)))
-              (recur (+ j channels))
-              (let [count (/ (- j i) channels)]
-                (.add runs (int count))
-                (doseq [c (range channels)]
-                  (.add runs (chs c)))
-                (recur j)))))))
-    (let [arr (case bits
-                8  (byte-array (.size runs))
-                16 (short-array (.size runs))
-                32 (float-array (.size runs)))]
-      (dotimes [i (.size runs)]
-        (aset arr i (.get runs i)))
-      arr)))
+        max-count (max-run-count bits)
+        runs (ArrayList.)
+        pixel-indices (range 0 total channels)
+        ;; 提交一个游程（可能分段）
+        commit-run (fn [state chs cnt]
+                     (loop [remaining cnt
+                            state state]
+                       (if (pos? remaining)
+                         (let [n (min remaining max-count)]
+                           (.add runs (int n))
+                           ;; 通道值：32位需编码为int位模式
+                           (doseq [c chs]
+                             (.add runs (case bits
+                                          32 (Float/floatToIntBits (float c))
+                                          (int c))))
+                           (recur (- remaining n) state))
+                         state)))
+        ;; 逐个像素累积
+        final-state
+        (reduce (fn [state i]
+                  (let [chs (mapv #(aget pixels (+ i %)) (range channels))
+                        {:keys [prev-chs current-count]} state]
+                    (if (and prev-chs (= chs prev-chs))
+                      ;; 相同像素，增加计数（超出限制由commit-run处理）
+                      (if (>= current-count max-count)
+                        (-> (commit-run state prev-chs current-count)
+                            (assoc :prev-chs chs :current-count 1))
+                        (assoc state :current-count (inc current-count)))
+                      ;; 像素变化，提交前一游程
+                      (-> (commit-run state prev-chs current-count)
+                          (assoc :prev-chs chs :current-count 1)))))
+                {:prev-chs nil :current-count 0}
+                pixel-indices)]
+    ;; 提交最后一个游程
+    (commit-run final-state (:prev-chs final-state) (:current-count final-state))
+    ;; 转换为相应原生数组
+    (let [size (.size runs)]
+      (case bits
+        8  (let [arr (byte-array size)]
+             (dotimes [k size] (aset arr k (byte (.get runs k))))
+             arr)
+        16 (let [arr (short-array size)]
+             (dotimes [k size] (aset arr k (short (.get runs k))))
+             arr)
+        32 (int-array (.size runs) (.toArray runs))))))
 
-(defn- runs->raster
-  "将游程数组解码为光栅像素数组。"
+;; ── 解压：游程 → 光栅 ─────────────────────────────
+(defn runs->raster
   [runs width height channels bits]
   (let [total (* width height channels)
         pixels (case bits
                  8  (byte-array total)
                  16 (short-array total)
                  32 (float-array total))]
-    (loop [ri 0 pi 0]
-      (when (< pi total)
-        (let [count (aget runs ri)
-              ri' (+ ri 1)]
-          (dotimes [_ count]
+    (loop [ri 0   ;; 游程数组索引
+           pi 0   ;; 像素数组索引
+           remaining 0   ;; 当前游程剩余像素数
+           chs nil]       ;; 当前游程的通道值序列
+      (if (< pi total)
+        (if (pos? remaining)
+          ;; 写入当前游程的一个像素
+          (do
             (doseq [c (range channels)]
-              (aset pixels (+ pi c) (aget runs (+ ri' c))))
-            (set! pi (+ pi channels)))
-          (recur (+ ri' channels) pi))))
-    pixels))
+              (let [v (nth chs c)]
+                (aset pixels (+ pi c)
+                      (case bits
+                        8  (util/int->byte (int v))      ;; 安全转换无符号 int->byte
+                        16 (util/int->short (int v))     ;; 安全转换无符号 int->short
+                        32 (Float/intBitsToFloat (int v))))))
+            (recur ri (+ pi channels) (dec remaining) chs))
+          ;; 读取下一个游程
+          (let [count (case bits
+                        8  (bit-and (aget runs ri) 0xFF)
+                        16 (bit-and (aget runs ri) 0xFFFF)
+                        32 (aget runs ri))
+                ri' (+ ri 1)
+                next-chs (vec (for [c (range channels)]
+                                (case bits
+                                  8  (bit-and (aget runs (+ ri' c)) 0xFF)
+                                  16 (bit-and (aget runs (+ ri' c)) 0xFFFF)
+                                  32 (aget runs (+ ri' c)))))]
+            (recur (+ ri' channels) pi count next-chs)))
+        pixels))))
 
+;; ── 公开接口 ──────────────────────────────────────
 (defn make-run-length-canvas
-  "创建一个游程画布。"
   [width height bits-per-channel channels & {:keys [color]}]
   (let [color (or color (repeat channels 0.0))
-        raster (raster/make-raster-canvas width height bits-per-channel channels :color color)
-        runs (raster->runs (:pixels raster) width height channels bits-per-channel)]
+        raster-canvas (raster/make-raster-canvas width height bits-per-channel channels :color color)
+        runs (raster->runs (:pixels raster-canvas) width height channels bits-per-channel)]
     {:type :run-length :width width :height height
      :bits-per-channel bits-per-channel :channels channels
      :runs runs}))
-
 
 (defn get-pixel-run-length
   [canvas x y]

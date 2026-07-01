@@ -1,6 +1,5 @@
 (ns top.kzre.krro.canvas.core.canvas.spec
-  "画布数据规格。根据 :bits-per-channel 确定内部存储类型，:channels 指定通道数。
-   支持任意通道配置，例如 1=灰度，3=RGB，4=RGBA，更多通道用于特殊数据。"
+  "画布数据规格。光栅画布检查像素数组类型与长度；游程画布仅检查 runs 存在且非空。"
   (:require [clojure.spec.alpha :as s]))
 
 ;; ── 公共属性 ─────────────────────────────────
@@ -27,27 +26,22 @@
   (and (instance? (expected-array-class bits-per-channel) pixels)
        (= (alength pixels) (* width height channels))))
 
-(s/def ::pixels
-  (s/with-gen
-    (s/and some? valid-pixel-array?)
-    (fn [] (s/gen #(float-array 0)))))
+(s/def ::pixels some?)
 
 (s/def ::raster-canvas
-  (s/merge ::canvas-common (s/keys :req-un [::pixels])))
+  (s/and (s/merge ::canvas-common (s/keys :req-un [::pixels]))
+         valid-pixel-array?))
 
 ;; ── 游程编码画布 ─────────────────────────────
 (defn- valid-runs-array?
-  [{:keys [bits-per-channel channels runs]}]
-  (and (instance? (expected-array-class bits-per-channel) runs)
-       (zero? (mod (alength runs) channels))))
+  [{:keys [runs]}]
+  (and (some? runs) (pos? (alength runs))))
 
-(s/def ::runs
-  (s/with-gen
-    (s/and some? valid-runs-array?)
-    (fn [] (s/gen #(float-array 0)))))
+(s/def ::runs some?)
 
 (s/def ::run-length-canvas
-  (s/merge ::canvas-common (s/keys :req-un [::runs])))
+  (s/and (s/merge ::canvas-common (s/keys :req-un [::runs]))
+         valid-runs-array?))
 
 ;; ── 画布联合规格 ─────────────────────────────
 (s/def ::canvas (s/or :raster ::raster-canvas

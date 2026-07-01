@@ -11,12 +11,17 @@
               8  (byte-array size)
               16 (short-array size)
               32 (float-array size))
-        native-color (mapv #(util/float->native % bits-per-channel) color)]
+        native-colors (mapv #(util/float->native % bits-per-channel) color)]
     (when (seq color)
       (dotimes [i (int (/ size channels))]
         (let [idx (* i channels)]
           (dotimes [c channels]
-            (aset arr (+ idx c) (native-color c))))))
+            (let [native (native-colors c)
+                  b (case bits-per-channel
+                      8  (util/int->byte native)
+                      16 (util/int->short native)
+                      32 native)]
+              (aset arr (+ idx c) b))))))
     {:type :raster :width width :height height
      :bits-per-channel bits-per-channel :channels channels
      :pixels arr}))
@@ -39,7 +44,12 @@
         idx (* channels (+ x (* y w)))
         pixels (:pixels canvas)]
     (doseq [c (range channels)]
-      (aset pixels (+ idx c) (util/float->native (nth vals c) bits)))))
+      (let [native (util/float->native (nth vals c) bits)
+            b (case bits
+                8  (util/int->byte native)
+                16 (util/int->short native)
+                32 native)]
+        (aset pixels (+ idx c) b)))))
 
 (defn raw-pixels
   "返回底层原生数组。"

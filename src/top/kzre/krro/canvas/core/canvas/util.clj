@@ -13,12 +13,25 @@
     32 (double v)))
 
 (defn float->native
-  "将 0.0‑1.0 浮点值转换为原生存储值。"
+  "将 0.0‑1.0 浮点值转换为无符号整数（int）。
+   8 位返回 0‑255，16 位返回 0‑65535，32 位返回 float。
+   使用四舍五入取整，极值钳制防止越界。"
   [val bits]
-  (case bits
-    8  (byte (Math/round (* (double val) byte-max)))
-    16 (short (Math/round (* (double val) short-max)))
-    32 (float val)))
+  (let [val (max 0.0 (min 1.0 (double val)))]
+    (case bits
+      8  (int (max 0 (min 255 (Math/round (* val byte-max)))))
+      16 (int (max 0 (min 65535 (Math/round (* val short-max)))))
+      32 (float val))))
+
+(defn int->byte
+  "将 0‑255 的 int 转换为等价的 byte（有符号表示）。"
+  [i]
+  (byte (if (<= i 127) i (- i 256))))
+
+(defn int->short
+  "将 0‑65535 的 int 转换为等价的 short（有符号表示）。"
+  [i]
+  (short (if (<= i 32767) i (- i 65536))))
 
 (defn canvas-width  [canvas] (:width canvas))
 (defn canvas-height [canvas] (:height canvas))
