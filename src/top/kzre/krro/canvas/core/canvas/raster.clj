@@ -29,9 +29,9 @@
 
 (defn get-pixel-raster
   [canvas x y]
-  (let [^int w (:width canvas)
-        ^int channels (:channels canvas)
-        ^int bits (:bits-per-channel canvas)
+  (let [w (:width canvas)
+        channels (:channels canvas)
+        bits (:bits-per-channel canvas)
         idx (* channels (+ x (* y w)))
         pixels (:pixels canvas)]
     (mapv #(util/native->float (aget pixels (+ idx %)) bits)
@@ -39,9 +39,9 @@
 
 (defn set-pixel-raster!
   [canvas x y vals]
-  (let [^int w (:width canvas)
-        ^int channels (:channels canvas)
-        ^int bits (:bits-per-channel canvas)
+  (let [ w (:width canvas)
+         channels (:channels canvas)
+         bits (:bits-per-channel canvas)
         idx (* channels (+ x (* y w)))
         pixels (:pixels canvas)]
     (doseq [c (range channels)]
