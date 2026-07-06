@@ -1,33 +1,41 @@
 (ns top.kzre.krro.canvas.core.layer.spec
   "图层数据规格 —— 公共属性集中定义，特有属性由 multi-spec 分派。
-   不包含任何具体图层类型实现，完全开放扩展。"
-  (:require [clojure.spec.alpha :as s]))
+   移除 :merged 类型（它只是内部合并描述，不是图层）。"
+  (:require [clojure.spec.alpha :as s]
+            [top.kzre.krro.canvas.core.canvas.protocol :as cp]))
 
-;; ── 公共属性（所有图层必须包含） ─────────────────
-(s/def ::id keyword?)   ;; 恢复为关键字
+;; ── 公共属性 ─────────────────────────────────
+(s/def ::id keyword?)
 (s/def ::name string?)
 (s/def ::type keyword?)
 (s/def ::opacity (s/and number? #(<= 0.0 % 1.0)))
 (s/def ::blend-mode keyword?)
 (s/def ::visible? boolean?)
-(s/def ::locked? boolean?)
+(s/def ::backend keyword?)
+
+;; 变换分解属性
+(s/def ::x number?)                               ;; X 轴平移
+(s/def ::y number?)                               ;; Y 轴平移
+(s/def ::scale-x (s/and number? #(> % 0.0)))      ;; X 轴缩放（>0）
+(s/def ::scale-y (s/and number? #(> % 0.0)))      ;; Y 轴缩放（>0）
+(s/def ::rotation number?)                        ;; 旋转角度（弧度）
 
 (s/def ::layer-common
-  (s/keys :req-un [::id ::type ::name ::opacity ::blend-mode ::visible? ::locked?]))
+  (s/keys :req-un [::id ::type ::name ::opacity ::blend-mode ::visible?]
+          :opt-un [::backend
+                   ::x ::y
+                   ::scale-x ::scale-y
+                   ::rotation]))
 
-;; ── 多方法分派（仅负责特有属性） ────────────────
+;; ── 多方法分派（特有属性） ──────────────────────
 (defmulti layer-spec :type)
 
-;; ── 图层组特有属性 ──────────────────────────────
-;; 先声明 ::layers 的递归容器，此时 ::layer 尚未定义，但 spec 允许延迟解析
-(s/def ::layers
-  (s/coll-of ::layer :kind vector?))
-
-;; 为 :group 类型注册特有属性 spec
+;; ── 图层组 ─────────────────────────────────────
+(s/def ::layers (s/coll-of ::layer :kind vector?))
 (defmethod layer-spec :group [_]
   (s/keys :req-un [::layers]))
 
-;; ── 完整图层（公共 + 特有） ─────────────────────
+;; ── 完整图层 ───────────────────────────────────
 (s/def ::layer
   (s/merge ::layer-common
            (s/multi-spec layer-spec :type)))

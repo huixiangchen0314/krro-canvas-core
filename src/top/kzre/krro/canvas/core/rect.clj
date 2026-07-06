@@ -13,11 +13,12 @@
   ([x y w h]
    [x y w h]))
 
-(defn area [[_ _ w h]]
-  (* w h))
+(defn aabb->rect
+  ([x y x1 y1]
+   [x y (+ 1 (- x1 x)) (+ 1 (- y1 y))])
+  ([[x y x1 y1]]
+   [x y  (+ 1 (- x1 x)) (+ 1 (- y1 y))]))
 
-(defn perimeter [[_ _ w h]]
-  (* 2 (+ w h)))
 
 (defn rect-contains-point?
   "判断矩形是否包含点 (px, py)，边界包含在内。"

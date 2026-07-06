@@ -1,25 +1,28 @@
 (ns top.kzre.krro.canvas.core.layer.group
   "图层组操作：创建、修改子图层，封装内部向量。"
-  (:require [top.kzre.krro.canvas.core.layer.spec :as spec]))
+  (:require [top.kzre.krro.canvas.core.layer.spec :as spec])
+  (:import (java.util UUID)))
 
 (defn make-layer-group
   "创建一个图层组。ID 默认为 UUID 字符串。"
-  [& {:keys [id name opacity blend-mode visible? locked? layers]
-      :or   {id          (keyword (str "group-" (java.util.UUID/randomUUID)))
-             name       "Group"
-             opacity    1.0
-             blend-mode :pass-through
-             visible?   true
-             locked?    false
-             layers     []}}]
+  [& {:keys [id name opacity blend-mode visible? layers]
+      :or   {id          (keyword (str "group-" (UUID/randomUUID)))
+             name        "Group"
+             opacity     1.0
+             blend-mode  :pass-through
+             visible?    true
+             layers      []}}]
   {:id         id
    :type       :group
    :name       name
    :opacity    opacity
    :blend-mode blend-mode
    :visible?   visible?
-   :locked?    locked?
    :layers     layers})
+
+(defn group?
+  [layer]
+  (= (:type layer) :group))
 
 (defn add-layer
   "在图层组末尾添加一个子图层，返回新图层组。"
