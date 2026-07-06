@@ -6,13 +6,10 @@
 
 (def ^:dynamic *merge-layer!*
   (fn [^floats data w h source]
-    (throw (UnsupportedOperationException. "*merge-layers!* not bound"))))
+    (throw (UnsupportedOperationException. "*merge-layer!* not bound"))))
 
-(defmulti render-batch!
-          (fn [backend ^floats data w h layers] backend))
-
-(defmulti render-layer!
-          (fn [layer ^floats data w h] (:type layer)))
+(defmulti render-batch! (fn [backend ^floats data w h layers] backend))
+(defmulti render-layer! (fn [layer ^floats data w h] (:type layer)))
 
 (defmethod render-batch! :default
   [_ data w h sources]
@@ -24,16 +21,14 @@
   (throw (ex-info (str "No render-layer! implementation for type: " (:type layer))
                   {:layer layer})))
 
-;; ── 辅助函数 ────────────────────────────────────
-
-(defn- allocate-data [w h]
-  (float-array (* w h 4)))
-
+;; ── 辅助 ─────────────────────────────────────────
 (defn- group-node? [x]
   (and (map? x) (= :group-node (:type x))))
 
-;; ── 图层树展开 ─────────────────────────────────
-(defn expand-layers [layers w h]
+;; ── 展开 ─────────────────────────────────────────
+(defn expand-layers
+  "将图层树展开为扁平栈（含组节点）。传入图层应已完成预处理和蒙板解析。"
+  [layers w h]
   (mapcat (fn [layer]
             (when (:visible? layer true)
               (if (group/group? layer)
@@ -45,19 +40,18 @@
                 [layer])))
           layers))
 
-;; ── 组渲染（保留组属性）─────────────────────────
+;; ── 组渲染 ──────────────────────────────────────
 (declare render-children!)
 (defn- render-group-node! [node data w h]
-  (let [temp-data (allocate-data w h)]
-    ;; 先渲染子栈到临时缓冲区
+  (let [temp-data (util/allocate-data w h)]
     (render-children! (:children node) temp-data w h)
-    ;; 将临时数据与原始组的属性（opacity, blend-mode 等）绑定
     (let [src-merged (merged/make-merged-layer (:group node) temp-data)]
-      ;; 使用 *merge-layers!* 将组结果混合到主画布，此时 src-merged 携带了组的混合属性
       (*merge-layer!* data w h src-merged))))
 
-;; ── 批处理调度 ─────────────────────────────────
-(defn render-children! [stack data w h]
+;; ── 批处理 ──────────────────────────────────────
+(defn render-children!
+  "遍历渲染栈，执行批处理和组渲染。"
+  [stack data w h]
   (let [batch (atom [])
         cur-be (atom nil)]
     (doseq [item stack]
@@ -79,7 +73,9 @@
     (when (seq @batch)
       (render-batch! @cur-be data w h @batch))))
 
-;; ── 顶层入口 ────────────────────────────────────
-(defn render-layers! [root-layers ^floats data w h]
-  (let [stack (expand-layers root-layers w h)]
+;; ── 简单入口（不再处理蒙板）─────────────────────
+(defn render-layers!
+  "直接渲染已准备好的图层列表到 data。不做预处理和蒙板解析。"
+  [layers ^floats data w h]
+  (let [stack (expand-layers layers w h)]
     (render-children! stack data w h)))

@@ -1,5 +1,6 @@
 (ns top.kzre.krro.canvas.core.layer.util
-  "图层相关的通用工具，包括变换矩阵构造、组合，以及图层性质判断。")
+  "图层相关的通用工具，包括变换矩阵构造、组合，图层性质判断，
+   以及临时缓冲区分配和 Alpha 提取。")
 
 ;; ── 变换矩阵常量 ──────────────────────────────────
 (def identity-matrix
@@ -42,3 +43,18 @@
   [layer]
   (let [bm (:blend-mode layer)]
     (or (nil? bm) (= :pass-through bm))))
+
+;; ── 缓冲区分配 ────────────────────────────────────
+(defn allocate-data
+  "分配一个 w*h*4 的浮点数组，用于 RGBA 画布。"
+  [w h]
+  (float-array (* w h 4)))
+
+;; ── Alpha 提取 ────────────────────────────────────
+(defn extract-alpha
+  "从 RGBA 浮点数组中提取 alpha 通道，返回单独的 float 数组，长度 w*h。"
+  [^floats rgba w h]
+  (let [alpha (float-array (* w h))]
+    (dotimes [i (* w h)]
+      (aset alpha i (aget rgba (+ (* 4 i) 3))))
+    alpha))
