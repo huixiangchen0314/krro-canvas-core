@@ -9,6 +9,8 @@
     (throw (UnsupportedOperationException. "*merge-layer!* not bound"))))
 
 (defmulti render-batch! (fn [backend ^floats data w h layers] backend))
+
+;; CPU 渲染分发.
 (defmulti render-layer! (fn [layer ^floats data w h] (:type layer)))
 
 (defmethod render-batch! :default

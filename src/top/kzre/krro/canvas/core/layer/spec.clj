@@ -43,6 +43,11 @@
 (defmethod layer-spec :group [_]
   (s/keys :req-un [::layers]))
 
+(s/def ::cache-data ::float-array)
+;; ── 缓存图层 ─────────────────────────────────
+(defmethod layer-spec :cached [_]
+  (s/keys :req-un [::cache-data]))
+
 ;; ── 完整图层 ───────────────────────────────────
 (s/def ::layer
   (s/merge ::layer-common

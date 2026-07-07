@@ -1,6 +1,7 @@
 (ns top.kzre.krro.canvas.core.core
   "krro-canvas-core 公共 API：画布与图层模块的总入口。"
   (:require
+   [top.kzre.krro.canvas.core.layer.cache :as cache]
    [top.kzre.krro.canvas.core.layer.core :as l]
    [top.kzre.krro.canvas.core.layer.group :as group]
    [top.kzre.krro.canvas.core.layer.mask :as mask]
@@ -22,6 +23,8 @@
 
 (def render-children! render/render-children!)
 
+(def invalidate-cache! cache/invalidate-cache!)
+(def prepare-cache cache/prepare-cache)
 
 ;; ── 图层组操作（不变） ─────────────────────────────
 (def make-layer-group group/make-layer-group)
