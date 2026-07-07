@@ -13,6 +13,11 @@
   ([x y w h]
    [x y w h]))
 
+(defn rect->array
+  "将 [x y x1 y1] 向量转为 int-array [x y w h]，若 nil 则返回 nil。"
+  [rect]
+  (int-array rect))
+
 (defn aabb->rect
   ([x y x1 y1]
    [x y (+ 1 (- x1 x)) (+ 1 (- y1 y))])
