@@ -28,12 +28,13 @@
         :layer ::layer))         ;; 引用另一个图层作为蒙板（剪贴蒙板/Alpha继承）
 
 (s/def ::layer-common
-  (s/keys :req-un [::id ::type ::name ::opacity ::blend-mode ::visible?]
+  (s/keys :req-un [::id ::type  ::opacity ::blend-mode ::visible?]
           :opt-un [::backend
                    ::x ::y
                    ::scale-x ::scale-y
                    ::rotation
-                   ::mask]))     ;; 蒙板为可选公共属性
+                   ::mask
+                   ::name]))     ;; 蒙板为可选公共属性
 
 ;; ── 多方法分派（特有属性） ──────────────────────
 (defmulti layer-spec :type)

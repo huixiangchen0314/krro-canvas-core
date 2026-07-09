@@ -1,6 +1,5 @@
 (ns top.kzre.krro.canvas.core.layer.group
   "图层组操作：创建、修改子图层，封装内部向量。"
-  (:require [top.kzre.krro.canvas.core.layer.spec :as spec])
   (:import (java.util UUID)))
 
 (defn make-layer-group

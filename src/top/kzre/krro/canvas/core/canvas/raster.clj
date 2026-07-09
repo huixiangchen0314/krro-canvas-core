@@ -26,7 +26,7 @@
       (dotimes [c ch]
         (aset res c (aget data (+ idx c))))
       res))
-  (set-pixel! [this x y ^floats color]
+  (set-pixel! [this x y color]
     (let [ch (channels-from-color-space color-space)
           idx (* ch (+ x (* y w)))]
       (dotimes [c ch]

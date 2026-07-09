@@ -3,6 +3,7 @@
   (:require
    [top.kzre.krro.canvas.core.layer.cache :as cache]
    [top.kzre.krro.canvas.core.layer.core :as l]
+   [top.kzre.krro.canvas.core.obb]
    [top.kzre.krro.canvas.core.layer.group :as group]
    [top.kzre.krro.canvas.core.layer.mask :as mask]
    [top.kzre.krro.canvas.core.layer.merged :as merged]
@@ -27,6 +28,7 @@
 (def prepare-cache cache/prepare-cache)
 
 ;; ── 图层组操作（不变） ─────────────────────────────
+(def group? group/group?)
 (def make-layer-group group/make-layer-group)
 (def add-layer-to-group group/add-layer)
 (def add-layer-to-group-at group/add-layer-at)

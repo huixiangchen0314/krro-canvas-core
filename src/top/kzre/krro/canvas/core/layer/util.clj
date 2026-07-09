@@ -1,6 +1,7 @@
 (ns top.kzre.krro.canvas.core.layer.util
   "图层相关的通用工具，包括变换矩阵构造、组合，图层性质判断，
    以及临时缓冲区分配和 Alpha 提取。"
+  (:require [top.kzre.krro.canvas.core.layer.group :as group])
   (:import (top.kzre.krro.canvas.core.layer MathUtils)))
 
 ;; ── 变换矩阵常量 ──────────────────────────────────
@@ -41,3 +42,14 @@
     (dotimes [i (* w h)]
       (aset alpha i (aget rgba (+ (* 4 i) 3))))
     alpha))
+
+(defn find-layer
+  "在图层列表（包括嵌套的图层组）中查找指定 ID 的图层。
+   返回图层 map，若未找到返回 nil。"
+  [layer-id layers]
+  (some (fn [layer]
+          (if (= (:id layer) layer-id)
+            layer
+            (when (group/group? layer)
+              (find-layer layer-id (:layers layer)))))
+        layers))
