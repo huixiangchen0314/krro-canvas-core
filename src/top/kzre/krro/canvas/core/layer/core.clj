@@ -9,8 +9,15 @@
     [top.kzre.krro.canvas.core.layer.transform :as trans]
     [top.kzre.krro.canvas.core.layer.util :as util]))
 
-(def find-layer util/find-layer)
 
+(def flatten-layers util/flatten-layers)
+(def find-layer util/find-layer)
+(def insert-layer util/insert-layer)
+(def remove-layer util/remove-layer)
+(def find-layer-path util/find-layer-path)
+(def find-layer-by-path util/find-layer-by-path)
+(def move-layer util/move-layer)
+(def parent-container util/parent-container)
 (defn render-layers!
   "渲染根图层列表到目标画布 data。
    自动预处理变换、解析蒙板引用、执行批量绘制。"

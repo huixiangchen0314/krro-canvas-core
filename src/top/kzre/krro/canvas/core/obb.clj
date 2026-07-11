@@ -58,7 +58,10 @@
         {:keys [data width height]} snapshot]
     (OBB/restoreSnapshot dest (int canvas-w) (int canvas-h) data (int width) (int height) j-obb)))
 
-
+(defn make-snapshot [data w h]
+  {:data data
+   :width w
+   :height h})
 
 (defn write-snapshot!
   "将快照 map 序列化写入 OutputStream。"
@@ -71,3 +74,17 @@
   [^InputStream in]
   (let [result (OBB/readSnapshot in)]
     {:data (.data result) :width (.width result) :height (.height result)}))
+
+(defn write-snapshot-temp!
+  "将快照 map 序列化写入 OutputStream。"
+  [snapshot]
+  (let [{:keys [data width height]} snapshot]
+    (OBB/writeSnapshotToTempFile data (int width) (int height))))
+
+(defn read-snapshot-temp!
+  "从 InputStream 读取快照，返回 {:data float-array :width w :height h}。"
+  [path]
+  (let [result (OBB/readSnapshotFromTempFile path)]
+    (make-snapshot (.data result)
+                   (.width result)
+                   (.height result))))

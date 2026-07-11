@@ -226,6 +226,32 @@ public final class OBB {
     }
 
     /**
+     * 将快照数据保存到临时文件，返回临时文件的绝对路径。
+     */
+    public static String writeSnapshotToTempFile(float[] data, int width, int height) {
+        try {
+            File tempFile = File.createTempFile("snapshot_", ".dat");
+            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                writeSnapshot(data, width, height, fos);
+            }
+            return tempFile.getAbsolutePath();
+        } catch (IOException e) {
+            throw new RuntimeException("保存快照到临时文件失败", e);
+        }
+    }
+
+    /**
+     * 从临时文件路径读取快照数据。
+     */
+    public static SnapshotData readSnapshotFromTempFile(String path) {
+        try (FileInputStream fis = new FileInputStream(path)) {
+            return readSnapshot(fis);
+        } catch (IOException e) {
+            throw new RuntimeException("从临时文件读取快照失败: " + path, e);
+        }
+    }
+
+    /**
      * 快照数据容器
      */
     public static class SnapshotData {

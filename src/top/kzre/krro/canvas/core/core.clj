@@ -1,14 +1,15 @@
 (ns top.kzre.krro.canvas.core.core
   "krro-canvas-core 公共 API：画布与图层模块的总入口。"
   (:require
-   [top.kzre.krro.canvas.core.layer.cache :as cache]
-   [top.kzre.krro.canvas.core.layer.core :as l]
-   [top.kzre.krro.canvas.core.obb]
-   [top.kzre.krro.canvas.core.layer.group :as group]
-   [top.kzre.krro.canvas.core.layer.mask :as mask]
-   [top.kzre.krro.canvas.core.layer.merged :as merged]
-   [top.kzre.krro.canvas.core.layer.render :as render]
-   [top.kzre.krro.canvas.core.layer.transform :as trans]))
+    [top.kzre.krro.canvas.core.layer.cache :as cache]
+    [top.kzre.krro.canvas.core.layer.core :as l]
+    [top.kzre.krro.canvas.core.layer.util :as util]
+    [top.kzre.krro.canvas.core.obb]
+    [top.kzre.krro.canvas.core.layer.group :as group]
+    [top.kzre.krro.canvas.core.layer.mask :as mask]
+    [top.kzre.krro.canvas.core.layer.merged :as merged]
+    [top.kzre.krro.canvas.core.layer.render :as render]
+    [top.kzre.krro.canvas.core.layer.transform :as trans]))
 
 ;; ── 图层操作 ────────────────────────────────────
 (def ^:dynamic *merge-layer!* render/*merge-layer!*)
