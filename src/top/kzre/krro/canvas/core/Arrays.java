@@ -93,49 +93,84 @@ public final class Arrays {
         return result;
     }
 
+    /**
+     * 将浮点数组进行游程编码并写入输出流。
+     * 格式：总长度(int) → [计数(int) 值(float)]...
+     * 计数 > 0 表示不重复的浮点数个数，紧跟相应数量的 float；
+     * 计数 < 0 表示重复次数（绝对值），紧跟一个 float 作为重复值。
+     */
+    public static void writeRLE(float[] data, DataOutputStream out) throws IOException {
+        out.writeInt(data.length);
+        int i = 0;
+        while (i < data.length) {
+            // 寻找连续相等段
+            int j = i + 1;
+            while (j < data.length && data[j] == data[i]) {
+                j++;
+            }
+            int repeatCount = j - i;
+            if (repeatCount >= 2) {          // 至少重复2次才压缩，避免膨胀
+                out.writeInt(-repeatCount);
+                out.writeFloat(data[i]);
+                i = j;
+            } else {
+                // 收集不重复段
+                int start = i;
+                while (i < data.length) {
+                    int k = i + 1;
+                    while (k < data.length && data[k] == data[i]) {
+                        k++;
+                    }
+                    if (k - i >= 2) {        // 遇到下一个重复段，停止收集
+                        break;
+                    }
+                    i++;
+                }
+                int len = i - start;
+                out.writeInt(len);
+                for (int t = start; t < i; t++) {
+                    out.writeFloat(data[t]);
+                }
+            }
+        }
+    }
+
+    /**
+     * 从输入流读取游程编码数据并解码为浮点数组。
+     * 输入流必须包含由 encodeRLE 写入的长度前缀。
+     */
+    public static float[] readRLE(DataInputStream in) throws IOException {
+        int totalLength = in.readInt();
+        float[] result = new float[totalLength];
+        int index = 0;
+        while (index < totalLength) {
+            int count = in.readInt();
+            if (count < 0) {
+                int repeat = -count;
+                float val = in.readFloat();
+                for (int i = 0; i < repeat; i++) {
+                    result[index++] = val;
+                }
+            } else if (count > 0) {
+                for (int i = 0; i < count; i++) {
+                    result[index++] = in.readFloat();
+                }
+            } else {
+                throw new IOException("无效的游程编码数据：count为0");
+            }
+        }
+        return result;
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 便捷临时文件操作（内部复用 RLE 工具）
+    // ═══════════════════════════════════════════════════
+
     public static String writeTemp(float[] v) {
         try {
             File tempFile = File.createTempFile("temp_floats_", ".dat");
             try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(tempFile.toPath()))) {
-                // 写入原始长度
-                dos.writeInt(v.length);
-                // 游程编码并写入
-                int i = 0;
-                while (i < v.length) {
-                    // 寻找连续相等序列
-                    int j = i + 1;
-                    while (j < v.length && v[j] == v[i]) {
-                        j++;
-                    }
-                    int repeatCount = j - i;
-                    if (repeatCount >= 2) {  // 至少重复2次才用 RLE，避免膨胀
-                        // 写负数表示重复次数
-                        dos.writeInt(-repeatCount);
-                        dos.writeFloat(v[i]);
-                        i = j;
-                    } else {
-                        // 收集不重复的序列
-                        int start = i;
-                        // 找到下一个重复段开始或结束
-                        while (i < v.length) {
-                            int k = i + 1;
-                            while (k < v.length && v[k] == v[i]) {
-                                k++;
-                            }
-                            if (k - i >= 2) {
-                                // 遇到了至少2次重复，不重复段到此为止
-                                break;
-                            }
-                            i++;
-                        }
-                        int len = i - start;
-                        // 写入正数表示不重复元素个数
-                        dos.writeInt(len);
-                        for (int t = start; t < i; t++) {
-                            dos.writeFloat(v[t]);
-                        }
-                    }
-                }
+                writeRLE(v, dos);
             }
             return tempFile.getAbsolutePath();
         } catch (IOException e) {
@@ -145,26 +180,7 @@ public final class Arrays {
 
     public static float[] readTemp(String path) {
         try (DataInputStream dis = new DataInputStream(Files.newInputStream(Paths.get(path)))) {
-            int totalLength = dis.readInt();
-            float[] result = new float[totalLength];
-            int index = 0;
-            while (index < totalLength) {
-                int count = dis.readInt();
-                if (count < 0) {
-                    int repeat = -count;
-                    float val = dis.readFloat();
-                    for (int i = 0; i < repeat; i++) {
-                        result[index++] = val;
-                    }
-                } else if (count > 0) {
-                    for (int i = 0; i < count; i++) {
-                        result[index++] = dis.readFloat();
-                    }
-                } else {
-                    throw new IOException("无效的游程编码数据：count为0");
-                }
-            }
-            return result;
+            return readRLE(dis);
         } catch (IOException e) {
             throw new RuntimeException("读取临时文件失败: " + path, e);
         }

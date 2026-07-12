@@ -3,13 +3,12 @@
   (:require
     [top.kzre.krro.canvas.core.layer.cache :as cache]
     [top.kzre.krro.canvas.core.layer.core :as l]
-    [top.kzre.krro.canvas.core.layer.util :as util]
-    [top.kzre.krro.canvas.core.obb]
     [top.kzre.krro.canvas.core.layer.group :as group]
-    [top.kzre.krro.canvas.core.layer.mask :as mask]
     [top.kzre.krro.canvas.core.layer.merged :as merged]
     [top.kzre.krro.canvas.core.layer.render :as render]
-    [top.kzre.krro.canvas.core.layer.transform :as trans]))
+
+    [top.kzre.krro.canvas.core.layer.transform :as trans]
+    [top.kzre.krro.canvas.core.obb]))
 
 ;; ── 图层操作 ────────────────────────────────────
 (def ^:dynamic *merge-layer!* render/*merge-layer!*)
@@ -19,7 +18,7 @@
 (def make-merged-layer merged/make-merged-layer)
 (def render-layers!    l/render-layers!)
 (def preprocess-transform trans/preprocess)
-(def prepare-masks mask/prepare-masks)
+
 
 (def expand-layers render/expand-layers)
 

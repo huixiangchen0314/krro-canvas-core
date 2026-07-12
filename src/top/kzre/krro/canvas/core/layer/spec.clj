@@ -22,18 +22,12 @@
 (s/def ::scale-y (s/and number? #(> % 0.0)))      ;; Y 轴缩放（>0）
 (s/def ::rotation number?)                        ;; 旋转角度（弧度）
 
-;; ── 蒙板属性 ─────────────────────────────────
-(s/def ::mask
-  (s/or :data  ::float-array   ;; 直接灰度像素蒙板（尺寸应与图层一致）
-        :layer ::layer))         ;; 引用另一个图层作为蒙板（剪贴蒙板/Alpha继承）
-
 (s/def ::layer-common
   (s/keys :req-un [::id ::type  ::opacity ::blend-mode ::visible?]
           :opt-un [::backend
                    ::x ::y
                    ::scale-x ::scale-y
                    ::rotation
-                   ::mask
                    ::name]))     ;; 蒙板为可选公共属性
 
 ;; ── 多方法分派（特有属性） ──────────────────────

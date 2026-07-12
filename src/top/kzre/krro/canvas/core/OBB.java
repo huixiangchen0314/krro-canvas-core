@@ -198,35 +198,31 @@ public final class OBB {
     }
 
     /**
-     * 将快照数据写入输出流。
+     * 将快照数据写入输出流（使用游程编码压缩）。
      */
     public static void writeSnapshot(float[] data, int width, int height, OutputStream out) throws IOException {
         DataOutputStream dos = new DataOutputStream(out);
         dos.writeInt(width);
         dos.writeInt(height);
-        for (float v : data) {
-            dos.writeFloat(v);
-        }
+        // 使用 Arrays 的 RLE 压缩代替逐元素写入
+        Arrays.writeRLE(data, dos);
         dos.flush();
     }
 
     /**
-     * 从输入流读取快照数据。
+     * 从输入流读取快照数据（自动解压游程编码）。
      */
     public static SnapshotData readSnapshot(InputStream in) throws IOException {
         DataInputStream dis = new DataInputStream(in);
         int w = dis.readInt();
         int h = dis.readInt();
-        int len = w * h * 4;
-        float[] data = new float[len];
-        for (int i = 0; i < len; i++) {
-            data[i] = dis.readFloat();
-        }
+        // 使用 Arrays 的 RLE 解压
+        float[] data = Arrays.readRLE(dis);
         return new SnapshotData(data, w, h);
     }
 
     /**
-     * 将快照数据保存到临时文件，返回临时文件的绝对路径。
+     * 将快照数据保存到临时文件（内部调用 writeSnapshot，自动 RLE 压缩）。
      */
     public static String writeSnapshotToTempFile(float[] data, int width, int height) {
         try {
@@ -241,7 +237,7 @@ public final class OBB {
     }
 
     /**
-     * 从临时文件路径读取快照数据。
+     * 从临时文件路径读取快照数据（自动 RLE 解压）。
      */
     public static SnapshotData readSnapshotFromTempFile(String path) {
         try (FileInputStream fis = new FileInputStream(path)) {
