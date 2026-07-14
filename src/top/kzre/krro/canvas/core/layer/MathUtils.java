@@ -40,5 +40,28 @@ public final class MathUtils {
                 x,
                 y
         };
+
+    }
+
+    /**
+     * 构造图层的逆变换矩阵（世界 → 本地）。
+     * 变换顺序为：逆平移 → 逆旋转 → 逆缩放，与正变换相反。
+     */
+    public static float[] composeInverseTransform(float x, float y,
+                                                  float scaleX, float scaleY,
+                                                  float rotation) {
+        float cosR = (float) Math.cos(rotation);
+        float sinR = (float) Math.sin(rotation);
+        // 处理缩放为0的退化情况，避免除零
+        float invSX = 1.0f / (scaleX == 0 ? 1e-6f : scaleX);
+        float invSY = 1.0f / (scaleY == 0 ? 1e-6f : scaleY);
+        return new float[] {
+                cosR * invSX,              // a
+                -sinR * invSY,             // b
+                sinR * invSX,              // c
+                cosR * invSY,              // d
+                -(cosR * x + sinR * y) * invSX,  // tx
+                (sinR * x - cosR * y) * invSY    // ty
+        };
     }
 }

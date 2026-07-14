@@ -9,7 +9,7 @@
    [top.kzre.krro.canvas.core.layer.transform :as trans]
    [top.kzre.krro.canvas.core.layer.util :as util]))
 
-
+(def transform-point util/transform-point)
 (def flatten-layers util/flatten-layers)
 (def find-layer util/find-layer)
 (def insert-layer util/insert-layer)

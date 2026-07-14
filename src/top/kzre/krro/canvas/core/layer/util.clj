@@ -20,6 +20,22 @@
     (float scale-x) (float scale-y)
     (float rotation)))
 
+(defn compose-inverse-transform
+  [{:keys [x y scale-x scale-y rotation]
+    :or {x 0.0 y 0.0 scale-x 1.0 scale-y 1.0 rotation 0.0}}]
+  (MathUtils/composeInverseTransform
+    (float x) (float y)
+    (float scale-x) (float scale-y)
+    (float rotation)))
+
+(defn transform-point
+  "使用 6 元素仿射矩阵 [a b c d tx ty] 变换点 (px, py)。"
+  [^floats matrix px py]
+  (let [a (aget matrix 0), b (aget matrix 1), c (aget matrix 2)
+        d (aget matrix 3), tx (aget matrix 4), ty (aget matrix 5)]
+    {:x (+ (* a (double px)) (* c (double py)) (double tx))
+     :y (+ (* b (double px)) (* d (double py)) (double ty))}))
+
 ;; ── 直通组判断 ────────────────────────────────────
 (defn pass-through?
   "判断图层是否为直通组（其子图层直接穿透到父级）。

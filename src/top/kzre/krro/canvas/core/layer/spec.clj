@@ -28,7 +28,7 @@
                    ::x ::y
                    ::scale-x ::scale-y
                    ::rotation
-                   ::name]))     ;; 蒙板为可选公共属性
+                   ::name]))
 
 ;; ── 多方法分派（特有属性） ──────────────────────
 (defmulti layer-spec :type)
