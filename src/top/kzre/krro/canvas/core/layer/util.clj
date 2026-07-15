@@ -36,6 +36,33 @@
     {:x (+ (* a (double px)) (* c (double py)) (double tx))
      :y (+ (* b (double px)) (* d (double py)) (double ty))}))
 
+(defn parent-inverse-transform
+  "计算当前图层的父级世界矩阵的逆矩阵。
+   layers 为原始图层列表（不含预处理），layer-path 为当前图层在列表中的路径。
+   返回逆矩阵 (float-array) 或 nil（表示无父变换，即根级图层）。"
+  [layers layer-path]
+  (let [parent-path (butlast layer-path)]
+    (when (seq parent-path)
+      (loop [remaining-path parent-path
+             current-matrix MathUtils/IDENTITY
+             current-layers layers]
+        (if (seq remaining-path)
+          (let [idx (first remaining-path)
+                layer (nth current-layers idx)
+                local-matrix (MathUtils/composeLocalTransform
+                               (float (get layer :x 0.0))
+                               (float (get layer :y 0.0))
+                               (float (get layer :scale-x 1.0))
+                               (float (get layer :scale-y 1.0))
+                               (float (get layer :rotation 0.0)))
+                parent-matrix (MathUtils/multiply current-matrix local-matrix)]
+            (recur (rest remaining-path)
+                   parent-matrix
+                   (:layers layer)))
+          ;; 所有祖先处理完毕，求逆
+          (MathUtils/invert current-matrix))))))
+
+
 ;; ── 直通组判断 ────────────────────────────────────
 (defn pass-through?
   "判断图层是否为直通组（其子图层直接穿透到父级）。

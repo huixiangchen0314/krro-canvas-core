@@ -7,6 +7,29 @@ public final class MathUtils {
     public static final float[] IDENTITY = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
 
     /**
+     * 计算 2D 仿射矩阵的逆矩阵。
+     * 矩阵格式：[a b c d tx ty]
+     * 逆矩阵公式：
+     * det = a*d - b*c
+     * 若 det 为 0，返回 null。
+     */
+    public static float[] invert(float[] m) {
+        float a = m[0], b = m[1], c = m[2], d = m[3], tx = m[4], ty = m[5];
+        double det = (double) a * d - (double) b * c;
+        if (Math.abs(det) < 1e-10) {
+            return null;
+        }
+        double invDet = 1.0 / det;
+        float aInv = (float) (d * invDet);
+        float bInv = (float) (-b * invDet);
+        float cInv = (float) (-c * invDet);
+        float dInv = (float) (a * invDet);
+        float txInv = (float) ((c * ty - d * tx) * invDet);
+        float tyInv = (float) ((b * tx - a * ty) * invDet);
+        return new float[] {aInv, bInv, cInv, dInv, txInv, tyInv};
+    }
+
+    /**
      * 右乘两个变换矩阵：parent * local。
      * 每个矩阵为 6 元素 float 数组 [a b c d tx ty]。
      */
