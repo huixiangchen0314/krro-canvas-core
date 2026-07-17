@@ -20,16 +20,10 @@
 (def find-layer-by-path util/find-layer-by-path)
 (def move-layer util/move-layer)
 (def parent-container util/parent-container)
+
 (defn render-layers!
-  "渲染根图层列表到目标画布 data。
-   先处理缓存（:cached?），再变换预处理，最终渲染。"
-  [root-layers ^floats data w h]
-  (let [;; 0. 缓存处理：将标记 :cached? 的图层/组预先光栅化为 :cached 图层
-        cached-layers (mapv #(cache/prepare-cache % w h) root-layers)
-        ;; 1. 变换预处理
-        preprocessed (mapv trans/preprocess cached-layers)
-        ;; 2. 展开并渲染（无蒙板）
-        stack (render/expand-layers preprocessed w h)]
-    (render/render-children! stack data w h)))
-
-
+  [root-layers ^floats data w h & {:as opts}]
+  (let [cached-layers (mapv #(cache/prepare-cache % w h opts) root-layers)
+        preprocessed  (mapv trans/preprocess cached-layers)
+        stack         (render/expand-layers preprocessed)]
+    (render/render-children! stack data w h opts)))
