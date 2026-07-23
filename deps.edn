@@ -1,5 +1,7 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        top.kzre/krro-util-math {:mvn/version "1.0-SNAPSHOT"}
+        top.kzre/color-utils {:mvn/version "1.0-SNAPSHOT"}
         }
 
  :aliases {:test {:extra-paths ["test"]

@@ -6,9 +6,7 @@
     [top.kzre.krro.canvas.core.layer.group :as group]
     [top.kzre.krro.canvas.core.layer.merged :as merged]
     [top.kzre.krro.canvas.core.layer.render :as render]
-
-    [top.kzre.krro.canvas.core.layer.transform :as trans]
-    [top.kzre.krro.canvas.core.obb]))
+    [top.kzre.krro.canvas.core.layer.transform :as trans]))
 
 ;; ── 图层操作 ────────────────────────────────────
 (def ^:dynamic *merge-layer!* render/*merge-layer!*)

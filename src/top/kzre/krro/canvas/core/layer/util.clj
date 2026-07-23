@@ -1,21 +1,36 @@
 (ns top.kzre.krro.canvas.core.layer.util
   "图层相关的通用工具，包括变换矩阵构造、组合，图层性质判断，
    以及临时缓冲区分配和 Alpha 提取。"
-  (:require [top.kzre.krro.canvas.core.layer.group :as group])
-  (:import (top.kzre.krro.canvas.core.layer MathUtils)))
+  (:require
+   [top.kzre.krro.canvas.core.layer.group :as group]
+   [top.kzre.krro.canvas.core.layer.util :as util])
+  (:import
+    (top.kzre.krro.canvas.core.layer MathUtils)
+   (top.kzre.krro.util.math KMath)))
+
+(defn ->string
+  "将 keyword 或字符串转为字符串。nil 返回 nil。"
+  [x]
+  (when x (name x)))
+
+(defn blend-mode-str
+  "从 map 中提取 :blend-mode 并转为字符串，缺失返回默认字符串。"
+  [m default]
+  (->string (get m :blend-mode default)))
 
 ;; ── 变换矩阵常量 ──────────────────────────────────
-(def identity-matrix MathUtils/IDENTITY)
+;; 单位仿射矩阵，外部不该对齐进行任何修改.
+(defonce identity-matrix (KMath/mat2dIdentity))
 
 (defn multiply-transform
   [parent local]
-  (MathUtils/multiply (float-array parent) (float-array local)))
+  (KMath/mat2dMul (float-array parent) (float-array local)))
 
 (defn compose-local-transform
   "从图层 map 提取变换参数，委托 Java 生成矩阵。"
   [{:keys [x y scale-x scale-y rotation]
     :or {x 0.0 y 0.0 scale-x 1.0 scale-y 1.0 rotation 0.0}}]
-  (MathUtils/composeLocalTransform
+  (KMath/mat2dCompose
     (float x) (float y)
     (float scale-x) (float scale-y)
     (float rotation)))
@@ -23,7 +38,7 @@
 (defn compose-inverse-transform
   [{:keys [x y scale-x scale-y rotation]
     :or {x 0.0 y 0.0 scale-x 1.0 scale-y 1.0 rotation 0.0}}]
-  (MathUtils/composeInverseTransform
+  (KMath/mat2dComposeInverse
     (float x) (float y)
     (float scale-x) (float scale-y)
     (float rotation)))
@@ -44,23 +59,23 @@
   (let [parent-path (butlast layer-path)]
     (when (seq parent-path)
       (loop [remaining-path parent-path
-             current-matrix MathUtils/IDENTITY
+             current-matrix util/identity-matrix
              current-layers layers]
         (if (seq remaining-path)
           (let [idx (first remaining-path)
                 layer (nth current-layers idx)
-                local-matrix (MathUtils/composeLocalTransform
+                local-matrix (KMath/mat2dCompose
                                (float (get layer :x 0.0))
                                (float (get layer :y 0.0))
                                (float (get layer :scale-x 1.0))
                                (float (get layer :scale-y 1.0))
                                (float (get layer :rotation 0.0)))
-                parent-matrix (MathUtils/multiply current-matrix local-matrix)]
+                parent-matrix (KMath/mat2dMul current-matrix local-matrix)]
             (recur (rest remaining-path)
                    parent-matrix
                    (:layers layer)))
           ;; 所有祖先处理完毕，求逆
-          (MathUtils/invert current-matrix))))))
+          (KMath/mat2dInvert current-matrix))))))
 
 
 ;; ── 直通组判断 ────────────────────────────────────

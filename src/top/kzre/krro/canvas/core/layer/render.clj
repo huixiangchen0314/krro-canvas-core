@@ -2,11 +2,27 @@
   (:require
     [top.kzre.krro.canvas.core.layer.group :as group]
     [top.kzre.krro.canvas.core.layer.merged :as merged]
-    [top.kzre.krro.canvas.core.layer.util :as util]))
+    [top.kzre.krro.canvas.core.layer.util :as util])
+  (:import (top.kzre.krro.canvas.core.layer PixelRenderer)))
 
 (def ^:dynamic *merge-layer!*
   (fn [^floats data w h source]
     (throw (UnsupportedOperationException. "*merge-layer!* not bound"))))
+
+(defn- merge-layer-impl
+  [^floats data w h source]
+  (let [src-data   (:data source)
+        blend-mode (util/blend-mode-str (:blend-mode source) :normal)
+        opacity    (float (get source :opacity 1.0))
+        transform  (get source :transform util/identity-matrix)]
+    (PixelRenderer/blendTransformed data src-data w h transform blend-mode opacity)))
+
+;; 默认 CPU 混合
+(defn use-raster-merge-layer!
+  []
+  (alter-var-root #'*merge-layer!* (constantly merge-layer-impl)))
+(use-raster-merge-layer!)
+
 
 (defmulti render-batch!
           (fn [backend ^floats _data _w _h _layers _opts] backend))
@@ -77,3 +93,7 @@
               (reset! cur-be be))))))
     (when (seq @batch)
       (render-batch! @cur-be data w h @batch opts))))
+
+
+
+
