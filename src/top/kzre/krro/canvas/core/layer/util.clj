@@ -75,7 +75,7 @@
                    parent-matrix
                    (:layers layer)))
           ;; 所有祖先处理完毕，求逆
-          (KMath/mat2dInvert current-matrix))))))
+          (KMath/mat2dInv current-matrix))))))
 
 
 ;; ── 直通组判断 ────────────────────────────────────

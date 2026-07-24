@@ -3,42 +3,43 @@
     [top.kzre.krro.canvas.core.layer.group :as group]
     [top.kzre.krro.canvas.core.layer.merged :as merged]
     [top.kzre.krro.canvas.core.layer.util :as util])
-  (:import (top.kzre.krro.canvas.core.layer PixelRenderer)))
+  (:import
+    (top.kzre.krro.canvas.core.layer PixelBlitter)
+    (top.kzre.krro.util.tile Canvas TiledCanvas)))
 
+;; ── 动态混合函数 ──────────────────────────────────
 (def ^:dynamic *merge-layer!*
-  (fn [^floats data w h source]
+  (fn [^Canvas _dest _source _w _h]
     (throw (UnsupportedOperationException. "*merge-layer!* not bound"))))
 
 (defn- merge-layer-impl
-  [^floats data w h source]
-  (let [src-data   (:data source)
+  [^Canvas dest source w h]
+  (let [src-canvas (:canvas source)                          ;; source 现在是 Canvas
         blend-mode (util/blend-mode-str (:blend-mode source) :normal)
         opacity    (float (get source :opacity 1.0))
         transform  (get source :transform util/identity-matrix)]
-    (PixelRenderer/blendTransformed data src-data w h transform blend-mode opacity)))
+    (PixelBlitter/blit dest w h src-canvas transform blend-mode opacity)))
 
-;; 默认 CPU 混合
 (defn use-raster-merge-layer!
   []
   (alter-var-root #'*merge-layer!* (constantly merge-layer-impl)))
 (use-raster-merge-layer!)
 
-
+;; ── 批渲染分发 ──────────────────────────────────
 (defmulti render-batch!
-          (fn [backend ^floats _data _w _h _layers _opts] backend))
+          (fn [backend ^Canvas _canvas _w _h _layers _opts] backend))
 
-;; CPU 渲染分发.
+;; ── 图层渲染分发 ────────────────────────────────
 (defmulti render-layer!
-          (fn [layer ^floats _data _w _h _opts] (:type layer)))
-
+          (fn [layer ^Canvas _canvas _w _h _opts] (:type layer)))
 
 (defmethod render-batch! :default
-  [_ data w h sources opts]
-  (doseq [layer sources]
-    (render-layer! layer data w h opts)))
+  [_ canvas w h layers opts]
+  (doseq [layer layers]
+    (render-layer! layer canvas w h opts)))
 
 (defmethod render-layer! :default
-  [layer _ _ _ _]
+  [layer _ _ _ _ _]
   (throw (ex-info (str "No render-layer! implementation for type: " (:type layer))
                   {:layer layer})))
 
@@ -46,9 +47,8 @@
 (defn- group-node? [x]
   (and (map? x) (= :group-node (:type x))))
 
-;; ── 展开 ─────────────────────────────────────────
+;; ── 展开图层树 ──────────────────────────────────
 (defn expand-layers
-  "将图层树展开为扁平栈（含组节点）。传入图层应已完成预处理和蒙板解析。"
   [layers]
   (mapcat (fn [layer]
             (when (:visible? layer true)
@@ -63,37 +63,34 @@
 
 ;; ── 组渲染 ──────────────────────────────────────
 (declare render-children!)
-(defn- render-group-node! [node data w h opts]
-  (let [temp-data (util/allocate-data w h)]
-    (render-children! (:children node) temp-data w h opts)
-    (let [src-merged (merged/make-merged-layer (:group node) temp-data)]
-      (*merge-layer!* data w h src-merged))))
+(defn- render-group-node! [node ^Canvas dest-canvas w h opts]
+  ;; 创建临时画布用于子图层渲染
+  (let [temp-canvas (TiledCanvas. (.getTileSize dest-canvas))]
+    (render-children! (:children node) temp-canvas w h opts)
+    (let [src-merged (merged/make-merged-layer (:group node) temp-canvas)]
+      (*merge-layer!* dest-canvas src-merged w h))))
 
-;; ── 批处理 ──────────────────────────────────────
+;; ── 遍历渲染栈 ──────────────────────────────────
 (defn render-children!
   "遍历渲染栈，执行批处理和组渲染。opts 透传给各渲染函数。"
-  [stack ^floats data w h opts]
+  [stack ^Canvas canvas w h opts]
   (let [batch (atom [])
         cur-be (atom nil)]
     (doseq [item stack]
       (if (group-node? item)
         (do
           (when (seq @batch)
-            (render-batch! @cur-be data w h @batch opts)
+            (render-batch! @cur-be canvas w h @batch opts)
             (reset! batch [])
             (reset! cur-be nil))
-          (render-group-node! item data w h opts))
+          (render-group-node! item canvas w h opts))
         (let [be (or (:backend item) :default)]
           (if (= @cur-be be)
             (swap! batch conj item)
             (do
               (when (seq @batch)
-                (render-batch! @cur-be data w h @batch opts))
+                (render-batch! @cur-be canvas w h @batch opts))
               (reset! batch [item])
               (reset! cur-be be))))))
     (when (seq @batch)
-      (render-batch! @cur-be data w h @batch opts))))
-
-
-
-
+      (render-batch! @cur-be canvas w h @batch opts))))

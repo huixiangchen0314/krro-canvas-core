@@ -21,7 +21,7 @@ public final class MathUtils {
      * @return 逆矩阵，若奇异则返回 null
      */
     public static float[] invert(float[] m) {
-        return KMath.mat2dInvert(m);
+        return KMath.mat2dInv(m);
     }
 
     /**
