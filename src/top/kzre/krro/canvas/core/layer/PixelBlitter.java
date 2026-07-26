@@ -6,6 +6,7 @@ import top.kzre.krro.util.pool.FloatsPool;
 import top.kzre.krro.util.pool.FloatsPools;
 import top.kzre.krro.util.tile.AntiAlias;
 import top.kzre.krro.util.tile.Canvas;
+import top.kzre.krro.util.tile.CanvasUtils;
 import top.kzre.krro.util.tile.TiledCanvas;
 
 import java.util.HashSet;
@@ -117,12 +118,23 @@ public final class PixelBlitter {
 
         // 一般变换路径
         float[] inv = KMath.mat2dInv(matrix2d);
-        if (inv == null) return;
+        if (inv == null) {
+            System.out.println("layer matrix cannot inv.");
+            return;
+        }
 
-        float[] dstTile = tilePool.acquire();
-        float[] srcColor = pool4f.acquire();   // 采样输出颜色
-        float[] bgColor  = pool4f.acquire();   // 目标背景像素
-        float[] sampleBuf = pool4f.acquire();  // 传递给 aa.read 的 color 参数，避免与 dst 共享
+// 用于双线性采样的临时数组（池化）
+        float[] sample00 = pool4f.acquire();
+        float[] sample10 = pool4f.acquire();
+        float[] sample01 = pool4f.acquire();
+        float[] sample11 = pool4f.acquire();
+
+        float[] srcColor = pool4f.acquire();   // 源像素采样结果
+        float[] blended  = pool4f.acquire();   // aa.read 输出
+
+// 分配一个输出缓冲（大小同瓦片），用于收集混合结果后统一写回
+        float[] outTile = tilePool.acquire();  // tileBufLen 大小
+
         try {
             for (long key : tiles) {
                 int tileX = TiledCanvas.unpackTx(key);
@@ -133,41 +145,54 @@ public final class PixelBlitter {
                 int bw = x1 - x0, bh = y1 - y0;
                 if (bw <= 0 || bh <= 0) continue;
 
-                dst.readBytes(dstTile, 0, x0, y0, bw, bh, bw);
+                // 无需预先读取目标瓦片，aa.read 会直接从 dst 画布获取背景色
 
                 for (int y = 0; y < bh; y++) {
                     int worldY = y0 + y;
                     for (int x = 0; x < bw; x++) {
                         int worldX = x0 + x;
-                        float sx = inv[0] * worldX + inv[2] * worldY + inv[4];
-                        float sy = inv[1] * worldX + inv[3] * worldY + inv[5];
 
-                        // 抗锯齿采样，使用独立的 sampleBuf 避免自我覆盖
-                        aa.read(srcColor, src, sx, sy, sampleBuf);
-                        float sa = srcColor[3] * opacity;
-                        if (sa == 0f) continue;
+                        // 1. 逆变换到源图坐标（像素中心采样，提升质量）
+                        float sx = inv[0] * (worldX + 0.5f) + inv[2] * (worldY + 0.5f) + inv[4];
+                        float sy = inv[1] * (worldX + 0.5f) + inv[3] * (worldY + 0.5f) + inv[5];
 
-                        int dstIdx = (y * bw + x) * channels;
-                        bgColor[0] = dstTile[dstIdx];
-                        bgColor[1] = dstTile[dstIdx+1];
-                        bgColor[2] = dstTile[dstIdx+2];
-                        bgColor[3] = dstTile[dstIdx+3];
+                        // 2. 双线性采样源画布颜色（无抗锯齿，直接读取）
+                        CanvasUtils.bilinearSample(src, sx, sy, srcColor, sample00, sample10, sample01, sample11);
+                        // 乘上全局透明度
+                        srcColor[3] *= opacity;
+                        if (srcColor[3] == 0f) {
+                            // 完全透明则保留背景，无需混合
+                            // 但由于 outTile 未初始化，需手动复制背景色
+                            // 这里直接从 dst 读取背景色写入 outTile
+                            dst.getPixel(worldX, worldY, blended);
+                            int idx = (y * bw + x) * channels;
+                            System.arraycopy(blended, 0, outTile, idx, channels);
+                            continue;
+                        }
 
-                        srcColor[3] = sa;
-                        float[] blended = Blends.blendWithAlpha(blendMode, bgColor, srcColor);
-                        dstTile[dstIdx]   = blended[0];
-                        dstTile[dstIdx+1] = blended[1];
-                        dstTile[dstIdx+2] = blended[2];
-                        dstTile[dstIdx+3] = blended[3];
+                        // 3. 使用 AntiAlias 将前景色混合到目标画布上
+                        //    aa.read 内部会以 dst 为背景、srcColor 为前景，
+                        //    在 (worldX+0.5, worldY+0.5) 处按子像素覆盖度混合
+                        aa.read(blended, dst, worldX + 0.5, worldY + 0.5, srcColor);
+
+                        // 4. 将混合结果存入输出瓦片
+                        int idx = (y * bw + x) * channels;
+                        System.arraycopy(blended, 0, outTile, idx, channels);
                     }
                 }
-                dst.writeBytes(dstTile, 0, x0, y0, bw, bh, bw);
+
+                // 5. 一次性写回目标画布
+                dst.writeBytes(outTile, 0, x0, y0, bw, bh, bw);
             }
         } finally {
-            tilePool.release(dstTile);
+            tilePool.release(outTile);
+            pool4f.release(sample00);
+            pool4f.release(sample10);
+            pool4f.release(sample01);
+            pool4f.release(sample11);
             pool4f.release(srcColor);
-            pool4f.release(bgColor);
-            pool4f.release(sampleBuf);
+            pool4f.release(blended);
         }
+
     }
 }
