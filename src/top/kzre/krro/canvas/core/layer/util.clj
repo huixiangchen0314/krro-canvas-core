@@ -5,8 +5,7 @@
    [top.kzre.krro.canvas.core.layer.group :as group]
    [top.kzre.krro.canvas.core.layer.util :as util])
   (:import
-    (top.kzre.krro.canvas.core.layer MathUtils)
-   (top.kzre.krro.util.math KMath)))
+    (top.kzre.krro.util.math KMath)))
 
 (defn ->string
   "将 keyword 或字符串转为字符串。nil 返回 nil。"

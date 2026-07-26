@@ -51,7 +51,7 @@
 (defn expand-layers
   [layers]
   (mapcat (fn [layer]
-            (when (:visible? layer true)
+            (when (:visible layer true)
               (if (group/group? layer)
                 (if (util/pass-through? layer)
                   (expand-layers (:layers layer))

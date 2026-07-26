@@ -12,7 +12,7 @@
 (s/def ::type keyword?)
 (s/def ::opacity (s/and number? #(<= 0.0 % 1.0)))
 (s/def ::blend-mode keyword?)
-(s/def ::visible? boolean?)
+(s/def ::visible boolean?)
 (s/def ::backend keyword?)
 
 ;; 变换分解属性
@@ -23,7 +23,7 @@
 (s/def ::rotation number?)                        ;; 旋转角度（弧度）
 
 (s/def ::layer-common
-  (s/keys :req-un [::id ::type  ::opacity ::blend-mode ::visible?]
+  (s/keys :req-un [::id ::type  ::opacity ::blend-mode ::visible]
           :opt-un [::backend
                    ::x ::y
                    ::scale-x ::scale-y

@@ -8,7 +8,7 @@
    {:type :merged
     :data canvas
     :canvas canvas
-    :visible? true
+    :visible true
     :id nil
     :name nil
     :opacity 1.0

@@ -4,19 +4,19 @@
 
 (defn make-layer-group
   "创建一个图层组。ID 默认为 UUID 字符串。"
-  [& {:keys [id name opacity blend-mode visible? layers]
+  [& {:keys [id name opacity blend-mode visible layers]
       :or   {id          (keyword (str "group-" (UUID/randomUUID)))
              name        "Group"
              opacity     1.0
              blend-mode  :pass-through
-             visible?    true
+             visible    true
              layers      []}}]
   {:id         id
    :type       :group
    :name       name
    :opacity    opacity
    :blend-mode blend-mode
-   :visible?   visible?
+   :visible   visible
    :layers     layers})
 
 (defn group?
