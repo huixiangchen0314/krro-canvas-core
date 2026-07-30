@@ -5,7 +5,10 @@
    [top.kzre.krro.canvas.core.layer.group :as group]
    [top.kzre.krro.canvas.core.layer.util :as util])
   (:import
-    (top.kzre.krro.util.math KMath)))
+   [java.util Set]
+   (top.kzre.krro.util.math KMath)))
+
+
 
 (defn ->string
   "将 keyword 或字符串转为字符串。nil 返回 nil。"
@@ -91,14 +94,6 @@
   [w h]
   (float-array (* w h 4)))
 
-;; ── Alpha 提取 ────────────────────────────────────
-(defn extract-alpha
-  "从 RGBA 浮点数组中提取 alpha 通道，返回单独的 float 数组，长度 w*h。"
-  [^floats rgba w h]
-  (let [alpha (float-array (* w h))]
-    (dotimes [i (* w h)]
-      (aset alpha i (aget rgba (+ (* 4 i) 3))))
-    alpha))
 
 (defn find-layer
   "在图层列表（包括嵌套的图层组）中查找指定 ID 的图层。
@@ -267,3 +262,30 @@
                        (flatten-layers (:layers layer) current-path (inc depth))))))
            (range)
            layers)))
+
+
+
+(defn layer-transform
+  "计算图层局部坐标系 → 世界坐标系的仿射变换矩阵。
+   layer       - 图层 map（至少包含 :id、变换属性）
+   canvas-data - 画布全局数据（需包含 :layers）
+   返回 float-array 长度 6，若路径无效则返回单位矩阵。"
+  [layer canvas-data]
+  (or (:transform layer)   ;; 如果图层已被预处理，直接使用世界矩阵
+      (let [layers     (:layers canvas-data)
+            layer-path (find-layer-path (:id layer) layers)]
+        (if layer-path
+          ;; 沿路径累积父世界矩阵 × 局部矩阵
+          (loop [remaining-path layer-path
+                 current-matrix identity-matrix
+                 current-layers layers]
+            (if-let [idx (first remaining-path)]
+              (let [current-layer (nth current-layers idx)
+                    local-matrix  (compose-local-transform current-layer)
+                    world-matrix  (KMath/mat2dMul current-matrix local-matrix)
+                    rest-path     (rest remaining-path)]
+                (if (seq rest-path)
+                  (recur rest-path world-matrix (:layers current-layer))
+                  world-matrix))
+              current-matrix))
+          identity-matrix))))

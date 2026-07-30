@@ -9,6 +9,7 @@
 
 ;; ── 动态混合函数 ──────────────────────────────────
 (def ^:dynamic *merge-layer!*
+  "混合中间合并结果的函数，源图层变换一定为单位变换"
   (fn [^Canvas _dest _source _w _h]
     (throw (UnsupportedOperationException. "*merge-layer!* not bound"))))
 
@@ -16,9 +17,9 @@
   [^Canvas dest source w h]
   (let [src-canvas (:canvas source)                          ;; source 现在是 Canvas
         blend-mode (util/blend-mode-str (:blend-mode source) :normal)
-        opacity    (float (get source :opacity 1.0))
-        transform  (get source :transform util/identity-matrix)]
-    (PixelBlitter/blit dest w h src-canvas transform blend-mode opacity)))
+        opacity    (float (get source :opacity 1.0))]
+    ;; 单位矩阵，开混合模式透明度，无需亚像素
+    (PixelBlitter/blit dest w h src-canvas util/identity-matrix blend-mode opacity false)))
 
 (defn use-raster-merge-layer!
   []
