@@ -15,6 +15,8 @@
 (s/def ::visible boolean?)
 (s/def ::backend keyword?)
 
+(s/def ::updated-at int?)
+
 ;; 变换分解属性
 (s/def ::x number?)                               ;; X 轴平移
 (s/def ::y number?)                               ;; Y 轴平移
@@ -23,7 +25,7 @@
 (s/def ::rotation number?)                        ;; 旋转角度（弧度）
 
 (s/def ::layer-common
-  (s/keys :req-un [::id ::type  ::opacity ::blend-mode ::visible]
+  (s/keys :req-un [::id ::type  ::opacity ::blend-mode ::visible ::updated-at]
           :opt-un [::backend
                    ::x ::y
                    ::scale-x ::scale-y

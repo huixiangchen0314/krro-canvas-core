@@ -123,8 +123,6 @@
     []
     (butlast path)))
 
-
-
 (defn find-layer-by-path
   "根据索引路径在图层列表中定位图层。
    path 为索引向量，如 [2 0] 表示根列表的第 2 个图层的第 0 个子图层。
@@ -193,6 +191,15 @@
               (when-let [sub (find-layer-path layer-id (:layers layer))]
                 (cons idx sub)))))
         (map-indexed vector layers)))
+
+(defn above-layer-path
+  "返回在 layer-id 上方插入新图层时应使用的路径。"
+  [layer-id layers]
+  (if-let [raw-path (find-layer-path layer-id layers)]
+    (let [parent (butlast raw-path)
+          idx (last raw-path)]
+      (conj (vec parent) (inc idx)))
+    [(count layers)]))
 
 (defn insert-layer
   "在图层列表 layers 的指定路径处插入 layer。返回新的图层向量。
@@ -289,3 +296,5 @@
                   world-matrix))
               current-matrix))
           identity-matrix))))
+
+
