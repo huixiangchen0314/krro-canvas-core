@@ -5,8 +5,7 @@
    [top.kzre.krro.canvas.core.layer.group :as group]
    [top.kzre.krro.canvas.core.layer.util :as util])
   (:import
-   [java.util Set]
-   (top.kzre.krro.util.math KMath)))
+    (top.kzre.krro.util.math KMath)))
 
 
 
