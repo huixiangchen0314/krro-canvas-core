@@ -79,6 +79,7 @@
           (KMath/mat2dInv current-matrix))))))
 
 
+
 ;; ── 直通组判断 ────────────────────────────────────
 (defn pass-through?
   "判断图层是否为直通组（其子图层直接穿透到父级）。
@@ -273,27 +274,46 @@
 
 (defn layer-transform
   "计算图层局部坐标系 → 世界坐标系的仿射变换矩阵。
-   layer       - 图层 map（至少包含 :id、变换属性）
-   canvas-data - 画布全局数据（需包含 :layers）
+   layer-path - 图层在层级中的索引路径（如 [0 1]）
+   layers     - 顶层图层列表
    返回 float-array 长度 6，若路径无效则返回单位矩阵。"
-  [layer canvas-data]
-  (or (:transform layer)   ;; 如果图层已被预处理，直接使用世界矩阵
-      (let [layers     (:layers canvas-data)
-            layer-path (find-layer-path (:id layer) layers)]
-        (if layer-path
-          ;; 沿路径累积父世界矩阵 × 局部矩阵
-          (loop [remaining-path layer-path
-                 current-matrix identity-matrix
-                 current-layers layers]
-            (if-let [idx (first remaining-path)]
-              (let [current-layer (nth current-layers idx)
-                    local-matrix  (compose-local-transform current-layer)
-                    world-matrix  (KMath/mat2dMul current-matrix local-matrix)
-                    rest-path     (rest remaining-path)]
-                (if (seq rest-path)
-                  (recur rest-path world-matrix (:layers current-layer))
-                  world-matrix))
-              current-matrix))
-          identity-matrix))))
+  [layer-path layers]
+  (loop [remaining-path layer-path
+         current-matrix identity-matrix
+         current-layers layers]
+    (if-let [idx (first remaining-path)]
+      (let [current-layer (nth current-layers idx)
+            local-matrix  (compose-local-transform current-layer)
+            world-matrix  (KMath/mat2dMul current-matrix local-matrix)]
+        (if-let [rest-path (seq (rest remaining-path))]
+          (recur rest-path world-matrix (:layers current-layer))
+          world-matrix))
+      current-matrix)))
 
+(defn layer-transform-inverse
+  "计算图层局部坐标系 → 世界坐标系的仿射变换矩阵的逆矩阵。
+   layer-path - 图层在层级中的索引路径（如 [0 1]）
+   layers     - 顶层图层列表
+   返回 float-array 长度 6，若矩阵不可逆则返回 nil。"
+  [layer-path layers]
+  (KMath/mat2dInv (layer-transform layer-path layers)))
 
+(defn parent-transform
+  "计算当前图层的父级世界变换矩阵。
+   layer-path - 当前图层在层级中的索引路径
+   layers     - 顶层图层列表
+   返回 float-array 长度 6，若当前图层为根级图层（无父级）则返回 nil。"
+  [layer-path layers]
+  (let [parent-path (butlast layer-path)]
+    (if (seq parent-path)
+      (layer-transform parent-path layers)
+      identity-matrix)))
+
+(defn parent-transform-inverse
+  "计算当前图层的父级世界矩阵的逆矩阵。
+   layer-path - 当前图层在层级中的索引路径
+   layers     - 顶层图层列表
+   返回逆矩阵 (float-array) 或 nil（表示无父变换，即根级图层）。"
+  [layer-path layers]
+  (when-let [parent-matrix (parent-transform layer-path layers)]
+    (KMath/mat2dInv parent-matrix)))
