@@ -317,3 +317,19 @@
   [layer-path layers]
   (when-let [parent-matrix (parent-transform layer-path layers)]
     (KMath/mat2dInv parent-matrix)))
+
+(defn update-layer-at [layers path updater]
+  (let [idx         (last path)
+        parent-path (butlast path)
+        parent      (parent-container path layers)
+        old-layer   (nth parent idx)
+        new-layer   (updater old-layer)
+        new-parent  (assoc-in parent [idx] new-layer)]
+    (if (seq parent-path)
+      (let [root-updated (assoc-in layers (interleave parent-path (repeat :layers)) new-parent)]
+        root-updated)
+      (assoc layers idx new-layer))))
+
+(defn replace-layer [layer layers]
+  (when-let [path (find-layer-path (:id layer) layers)]
+    (update-layer-at layers path (constantly layer))))
