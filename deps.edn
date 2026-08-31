@@ -3,6 +3,9 @@
         top.kzre/krro-util-math {:mvn/version "1.0-SNAPSHOT"}
         top.kzre/color-utils {:mvn/version "1.0-SNAPSHOT"}
         top.kzre/krro-util-tile {:mvn/version "1.0-SNAPSHOT"}
+
+        com.taoensso/timbre {:mvn/version "6.3.1"}
+        com.taoensso/tufte {:mvn/version "2.6.3"}
         }
 
  :aliases {:test {:extra-paths ["test"]
