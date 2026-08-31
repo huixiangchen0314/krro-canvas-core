@@ -15,5 +15,5 @@
                    (assoc processed :layers (mapv #(process-layer % world-transform) children)))
                  processed)))]
      (if-let [viewport-transform (:viewport opts)]
-       (process-layer layer (KMath/mat2dInv viewport-transform))
+       (process-layer layer viewport-transform)
        (process-layer layer util/identity-matrix)))))
