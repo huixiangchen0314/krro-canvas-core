@@ -7,9 +7,24 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class LayerUtils {
+
     private static final float EPSILON = 1e-6f;
 
     private LayerUtils() {}
+
+    public static Set<Long> dirtyTiles(int canvasW, int canvasH, int tileSize) {
+        Set<Long> tiles = new HashSet<>();
+        int minTx = TiledCanvas.tileX(0, tileSize);
+        int maxTx = TiledCanvas.tileX(canvasW - 1, tileSize);
+        int minTy = TiledCanvas.tileY(0, tileSize);
+        int maxTy = TiledCanvas.tileY(canvasH - 1, tileSize);
+        for (int ty = minTy; ty <= maxTy; ty++) {
+            for (int tx = minTx; tx <= maxTx; tx++) {
+                tiles.add(TiledCanvas.pack(tx, ty));
+            }
+        }
+        return tiles;
+    }
 
     public static Set<Long> transformTiles(
             Set<Long> localDirtyTiles,

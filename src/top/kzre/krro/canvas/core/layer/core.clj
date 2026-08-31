@@ -28,15 +28,19 @@
   "渲染图层树到目标画布。
    root-layers : 根图层列表（已预处理）
    canvas      : 目标画布 (TiledCanvas)
-   w, h        : 画布宽度、高度（像素）
+   canvas-w, canvas-h        : 画布宽度、高度（像素）
    opts        : 透传选项（如 :dirty-tiles, :tile-size）"
-  [root-layers ^TiledCanvas canvas w h & {:as opts}]
+  [root-layers ^TiledCanvas canvas canvas-w canvas-h & {:keys [dirty-tiles]
+                                                        :as opts}]
   (let [tile-size (.getTileSize canvas)
         preprocessed  (mapv #(trans/preprocess % opts) root-layers)
         layers         (render/expand-layers preprocessed)
-        ]
+
+        opts' (assoc opts :dirty-tiles
+                          (or dirty-tiles
+                              (LayerUtils/dirtyTiles canvas-w canvas-h tile-size)))]
     (render/render
       (fn [c]
         (log/debug  "rendered tiles")
         (.mergeCanvas canvas c))
-      layers w h tile-size opts)))
+      layers canvas-w canvas-h tile-size opts')))
