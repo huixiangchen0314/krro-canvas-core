@@ -26,6 +26,26 @@ public final class LayerUtils {
         return tiles;
     }
 
+    /**
+     * aabb 包围盒转 脏瓦片
+     */
+    public static Set<Long> aabbTiles(int tileSize, float minX, float minY, float maxX, float maxY) {
+        Set<Long> result = new HashSet<>();
+        if (minX > maxX || minY > maxY) {
+            return result;
+        }
+        int minTx = (int) Math.floor(minX / tileSize);
+        int maxTx = (int) Math.floor((maxX - 1e-12f) / tileSize);
+        int minTy = (int) Math.floor(minY / tileSize);
+        int maxTy = (int) Math.floor((maxY - 1e-12f) / tileSize);
+        for (int ty = minTy; ty <= maxTy; ty++) {
+            for (int tx = minTx; tx <= maxTx; tx++) {
+                result.add(TiledCanvas.pack(tx, ty));
+            }
+        }
+        return result;
+    }
+
     public static Set<Long> transformTiles(
             Set<Long> localDirtyTiles,
             int tileSize,
