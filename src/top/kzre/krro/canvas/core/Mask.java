@@ -1,7 +1,7 @@
 package top.kzre.krro.canvas.core;
 
 /**
- * 掩码接口
+ * 蒙板接口
  */
 @FunctionalInterface
 public interface Mask {

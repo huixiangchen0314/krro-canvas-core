@@ -29,7 +29,9 @@ public final class LayerUtils {
     /**
      * aabb 包围盒转 脏瓦片
      */
-    public static Set<Long> aabbTiles(int tileSize, float minX, float minY, float maxX, float maxY) {
+    public static Set<Long> aabbTiles(int tileSize,
+                                      float minX, float minY,
+                                      float maxX, float maxY) {
         Set<Long> result = new HashSet<>();
         if (minX > maxX || minY > maxY) {
             return result;
