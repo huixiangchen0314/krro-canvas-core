@@ -183,10 +183,9 @@ public final class QuadTree<T> {
     }
 
 
-
     // ========== 查询 ==========
 
-    public void query(Rect rect, Consumer<T> consumer) {
+    public void query(Rect rect, Consumer<Entry<T>> consumer) {
         if (!bounds.intersects(rect)) return;
 
         if (divided) {
@@ -197,14 +196,21 @@ public final class QuadTree<T> {
         } else {
             for (Entry<T> e : entries) {
                 if (rect.contains(e.x, e.y)) {
-                    consumer.accept(e.value);
+                    consumer.accept(e);
                 }
             }
         }
     }
 
-    public List<T> query(Rect rect) {
-        List<T> result = new ArrayList<>();
+    public List<Entry<T>> query(Rect rect) {
+        List<Entry<T>> result = new ArrayList<>();
+        query(rect, result::add);
+        return result;
+    }
+
+    public List<Entry<T>> queryPoint(double x, double y, double threshold) {
+        Rect rect = new Rect(x - threshold, y - threshold, x + threshold, y + threshold);
+        List<Entry<T>> result = new ArrayList<>();
         query(rect, result::add);
         return result;
     }
@@ -421,42 +427,4 @@ public final class QuadTree<T> {
         }
     }
 
-    public static class Rect {
-        public final double xMin, yMin, xMax, yMax;
-
-        public Rect(double xMin, double yMin, double xMax, double yMax) {
-            if (xMin > xMax || yMin > yMax)
-                throw new IllegalArgumentException("Invalid rect bounds");
-            this.xMin = xMin;
-            this.yMin = yMin;
-            this.xMax = xMax;
-            this.yMax = yMax;
-        }
-
-        public boolean contains(double x, double y) {
-            return x >= xMin && x <= xMax && y >= yMin && y <= yMax;
-        }
-
-        public boolean intersects(Rect other) {
-            return !(other.xMin > xMax || other.xMax < xMin ||
-                    other.yMin > yMax || other.yMax < yMin);
-        }
-
-        public double midX() { return (xMin + xMax) * 0.5; }
-        public double midY() { return (yMin + yMax) * 0.5; }
-
-        public double distToPointSq(double x, double y) {
-            double dx = 0, dy = 0;
-            if (x < xMin) dx = xMin - x;
-            else if (x > xMax) dx = x - xMax;
-            if (y < yMin) dy = yMin - y;
-            else if (y > yMax) dy = y - yMax;
-            return dx * dx + dy * dy;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("Rect[%.2f,%.2f,%.2f,%.2f]", xMin, yMin, xMax, yMax);
-        }
-    }
 }
