@@ -223,24 +223,28 @@ public final class QuadTree<T> {
         if (!divided) {
             T bestValue = null;
             double best = bestDist;
+            double bestX = 0, bestY = 0;
             for (Entry<T> e : entries) {
                 double d = distSq(x, y, e.x, e.y);
                 if (d < best) {
                     best = d;
                     bestValue = e.value;
+                    bestX = e.x;
+                    bestY = e.y;
                 }
             }
-            return (bestValue == null) ? null : new NearestResult<>(bestValue, best, x, y);
+            return (bestValue == null) ? null : new NearestResult<>(bestValue, best, bestX, bestY);
         } else {
             QuadTree<T>[] children = orderChildren(x, y);
             NearestResult<T> bestResult = null;
+            double currentBest = bestDist;
             for (QuadTree<T> child : children) {
                 if (child == null) continue;
                 double minDist = child.bounds.distToPointSq(x, y);
-                if (minDist >= bestDist) continue;
-                NearestResult<T> candidate = child.nearest(x, y, bestDist);
-                if (candidate != null && candidate.distSq < bestDist) {
-                    bestDist = candidate.distSq;
+                if (minDist >= currentBest) continue;
+                NearestResult<T> candidate = child.nearest(x, y, currentBest);
+                if (candidate != null && candidate.distSq < currentBest) {
+                    currentBest = candidate.distSq;
                     bestResult = candidate;
                 }
             }
