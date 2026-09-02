@@ -160,7 +160,7 @@ public final class QuadTree<T> {
         } else {
             for (int i = 0; i < entries.size(); i++) {
                 Entry<T> e = entries.get(i);
-                if (Math.abs(e.x - x) < 1e-9 && Math.abs(e.y - y) < 1e-9 && e.value.equals(value)) {
+                if (e.value.equals(value)) {
                     entries.remove(i);
                     return true;
                 }
