@@ -215,12 +215,11 @@ public final class QuadTree<T> {
         return result;
     }
 
-    public T nearest(double x, double y) {
-        Result<T> result = nearest(x, y, Double.MAX_VALUE);
-        return result == null ? null : result.value;
+    public NearestResult<T> nearest(double x, double y) {
+        return nearest(x, y, Double.MAX_VALUE);
     }
 
-    private Result<T> nearest(double x, double y, double bestDist) {
+    private NearestResult<T> nearest(double x, double y, double bestDist) {
         if (!divided) {
             T bestValue = null;
             double best = bestDist;
@@ -231,17 +230,17 @@ public final class QuadTree<T> {
                     bestValue = e.value;
                 }
             }
-            return (bestValue == null) ? null : new Result<>(bestValue, best);
+            return (bestValue == null) ? null : new NearestResult<>(bestValue, best, x, y);
         } else {
             QuadTree<T>[] children = orderChildren(x, y);
-            Result<T> bestResult = null;
+            NearestResult<T> bestResult = null;
             for (QuadTree<T> child : children) {
                 if (child == null) continue;
                 double minDist = child.bounds.distToPointSq(x, y);
                 if (minDist >= bestDist) continue;
-                Result<T> candidate = child.nearest(x, y, bestDist);
-                if (candidate != null && candidate.dist < bestDist) {
-                    bestDist = candidate.dist;
+                NearestResult<T> candidate = child.nearest(x, y, bestDist);
+                if (candidate != null && candidate.distSq < bestDist) {
+                    bestDist = candidate.distSq;
                     bestResult = candidate;
                 }
             }
@@ -399,12 +398,6 @@ public final class QuadTree<T> {
             this.y = y;
             this.value = value;
         }
-    }
-
-    private static class Result<T> {
-        final T value;
-        final double dist;
-        Result(T value, double dist) { this.value = value; this.dist = dist; }
     }
 
     public static class NearestResult<T> {
