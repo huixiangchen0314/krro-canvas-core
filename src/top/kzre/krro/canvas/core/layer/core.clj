@@ -9,8 +9,9 @@
    [top.kzre.krro.canvas.core.layer.transform :as trans]
    [top.kzre.krro.canvas.core.layer.util :as util])
   (:import
-    (top.kzre.krro.canvas.core.layer LayerUtils)
-    (top.kzre.krro.util.tile TiledCanvas)))
+   [java.util Set]
+   (top.kzre.krro.canvas.core.layer LayerUtils)
+   (top.kzre.krro.util.tile TiledCanvas)))
 
 (def parent-inverse-transform util/parent-inverse-transform)
 (def compose-inverse-transform util/compose-inverse-transform)
@@ -35,12 +36,12 @@
   (let [tile-size (.getTileSize canvas)
         preprocessed  (mapv #(trans/preprocess % opts) root-layers)
         layers         (render/expand-layers preprocessed)
-
-        opts' (assoc opts :dirty-tiles
-                          (or dirty-tiles
-                              (LayerUtils/dirtyTiles canvas-w canvas-h tile-size)))]
+        ^Set dirty-tiles' (or dirty-tiles
+                         (LayerUtils/dirtyTiles canvas-w canvas-h tile-size))
+        opts' (assoc opts :dirty-tiles dirty-tiles')]
     (render/render
       (fn [c]
         (log/debug  "rendered tiles")
+        (.deleteTiles canvas dirty-tiles')
         (.mergeCanvas canvas c))
       layers canvas-w canvas-h tile-size opts')))

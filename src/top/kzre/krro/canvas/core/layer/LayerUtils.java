@@ -30,16 +30,15 @@ public final class LayerUtils {
      * aabb 包围盒转 脏瓦片
      */
     public static Set<Long> aabbTiles(int tileSize,
-                                      float minX, float minY,
-                                      float maxX, float maxY) {
+                                      double minX, double minY,
+                                      double maxX, double maxY) {
         Set<Long> result = new HashSet<>();
-        if (minX > maxX || minY > maxY) {
-            return result;
-        }
-        int minTx = (int) Math.floor(minX / tileSize);
-        int maxTx = (int) Math.floor((maxX - 1e-12f) / tileSize);
-        int minTy = (int) Math.floor(minY / tileSize);
-        int maxTy = (int) Math.floor((maxY - 1e-12f) / tileSize);
+        if (minX > maxX || minY > maxY) return result;
+        float eps = 1e-6f;
+        int minTx = (int) Math.floor((minX - eps) / tileSize);
+        int maxTx = (int) Math.floor((maxX + eps) / tileSize);
+        int minTy = (int) Math.floor((minY - eps) / tileSize);
+        int maxTy = (int) Math.floor((maxY + eps) / tileSize);
         for (int ty = minTy; ty <= maxTy; ty++) {
             for (int tx = minTx; tx <= maxTx; tx++) {
                 result.add(TiledCanvas.pack(tx, ty));
