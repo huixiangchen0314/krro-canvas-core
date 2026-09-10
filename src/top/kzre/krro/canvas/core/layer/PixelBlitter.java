@@ -270,11 +270,13 @@ public final class PixelBlitter {
                                 float bot = s01[i] + (s11[i] - s01[i]) * fx;
                                 srcColor[i] = top + (bot - top) * fy;
                             }
+                            // 插值后反预乘，恢复 straight alpha
                             float aCol = srcColor[3];
                             if (aCol > 1e-6f) {
-                                srcColor[0] = Math.min(Math.max(srcColor[0], 0f), aCol);
-                                srcColor[1] = Math.min(Math.max(srcColor[1], 0f), aCol);
-                                srcColor[2] = Math.min(Math.max(srcColor[2], 0f), aCol);
+                                float invA = 1.0f / aCol;
+                                srcColor[0] *= invA;
+                                srcColor[1] *= invA;
+                                srcColor[2] *= invA;
                             } else {
                                 Arrays.fill(srcColor, 0f);
                             }
@@ -294,7 +296,7 @@ public final class PixelBlitter {
                     }
                     srcColor[3] = aSrc;
 
-                    Blends.blendWithPreAlpha(blendMode,
+                    Blends.blendWithAlpha(blendMode,
                             dstData, dstIdx,
                             dstData, dstIdx,
                             srcColor, 0);
