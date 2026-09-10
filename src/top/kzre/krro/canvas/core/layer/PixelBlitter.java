@@ -5,7 +5,6 @@ import top.kzre.krro.util.math.KMath;
 import top.kzre.krro.util.pool.FloatsHolder;
 import top.kzre.krro.util.pool.FloatsPool;
 import top.kzre.krro.util.pool.PoolManagers;
-import top.kzre.krro.util.pool.PoolsHolder;
 import top.kzre.krro.util.tile.*;
 
 import java.util.*;
@@ -20,6 +19,13 @@ import java.util.concurrent.RecursiveAction;
  */
 public final class PixelBlitter {
 
+   private static final FloatsPool pool4f;
+
+   static {
+       FloatsHolder holder = PoolManagers.floats().getHolder();
+       pool4f = holder.getPool(4);
+   }
+
     private static final float ALPHA_THRESHOLD = 1e-6f;
 
     // ──────────── 对外 API ────────────
@@ -28,16 +34,23 @@ public final class PixelBlitter {
         blit(dst, w, h, src, matrix2d, blendMode, opacity, true);
     }
 
-    public static void blit(TiledCanvas dst, int w, int h, TiledCanvas src,
+    public static void blit(TiledCanvas dst, int canvasW, int canvasH, TiledCanvas src,
                             float[] matrix2d, String blendMode, float opacity,
                             boolean subpixel) {
-        blit(dst, w, h, src, matrix2d, blendMode, opacity,
+        blit(dst, canvasW, canvasH, src, matrix2d, blendMode, opacity,
                 AntiAlias.ssaa2x2(), null, subpixel);
+    }
+
+    @Deprecated
+    public static void blit(TiledCanvas dst, int canvasW, int canvasH, TiledCanvas src,
+                            float[] matrix2d, String blendMode, float opacity,
+                            AntiAlias aa, Set<Long> dirtyTiles, boolean subpixel) {
+        blit(dst, canvasW, canvasH, src, matrix2d, blendMode, opacity, dirtyTiles, subpixel);
     }
 
     public static void blit(TiledCanvas dst, int canvasW, int canvasH, TiledCanvas src,
                             float[] matrix2d, String blendMode, float opacity,
-                            AntiAlias aa, Set<Long> dirtyTiles, boolean subpixel) {
+                             Set<Long> dirtyTiles, boolean subpixel) {
         if (dirtyTiles != null && dirtyTiles.isEmpty()) return;
 
         final int tileSize = dst.getTileSize();
@@ -70,7 +83,7 @@ public final class PixelBlitter {
             if (inv == null) return;
             for (long key : tiles) {
                 tasks.add(new BlitTaskTransform(dst, canvasW, canvasH, src, inv, blendMode, opacity,
-                        aa, tileSize, subpixel, key));
+                        tileSize, subpixel, key));
             }
         }
 
@@ -163,14 +176,13 @@ public final class PixelBlitter {
         private final float[] inv;
         private final String blendMode;
         private final float opacity;
-        private final AntiAlias aa;
         private final int tileSize;
         private final boolean subpixel;
         private final long key;
 
         BlitTaskTransform(TiledCanvas dst, int w, int h, TiledCanvas src,
                           float[] inv, String blendMode, float opacity,
-                          AntiAlias aa, int tileSize, boolean subpixel, long key) {
+                          int tileSize, boolean subpixel, long key) {
             this.dst = dst;
             this.w = w;
             this.h = h;
@@ -178,7 +190,6 @@ public final class PixelBlitter {
             this.inv = inv;
             this.blendMode = blendMode;
             this.opacity = opacity;
-            this.aa = aa;
             this.tileSize = tileSize;
             this.subpixel = subpixel;
             this.key = key;
@@ -186,14 +197,14 @@ public final class PixelBlitter {
 
         @Override
         protected void compute() {
-            blitGeneral(dst, w, h, src, inv, blendMode, opacity, aa, tileSize, subpixel, key);
+            blitGeneral(dst, w, h, src, inv, blendMode, opacity, tileSize, subpixel, key);
         }
     }
 
     // ──────────── 一般变换（旋转/缩放/亚像素） ────────────
     private static void blitGeneral(TiledCanvas dst, int w, int h, TiledCanvas src,
                                     float[] inv, String blendMode, float opacity,
-                                    AntiAlias aa, int tileSize, boolean subpixel,
+                                    int tileSize, boolean subpixel,
                                     long key) {
         int tileX = TiledCanvas.unpackTx(key);
         int tileY = TiledCanvas.unpackTy(key);
@@ -207,14 +218,12 @@ public final class PixelBlitter {
         float[] dstData = dstTile.getPixelsForWrite();
         int channels = dst.getChannels();
 
-        FloatsHolder holder = PoolManagers.floats().getHolder();
-        FloatsPool pool = holder.getPool(4);
-        float[] srcColor = pool.acquire();
-        float[] blended = pool.acquire();
-        float[] s00 = subpixel ? pool.acquire() : null;
-        float[] s10 = subpixel ? pool.acquire() : null;
-        float[] s01 = subpixel ? pool.acquire() : null;
-        float[] s11 = subpixel ? pool.acquire() : null;
+
+        float[] srcColor = pool4f.acquire();
+        float[] s00 = subpixel ? pool4f.acquire() : null;
+        float[] s10 = subpixel ? pool4f.acquire() : null;
+        float[] s01 = subpixel ? pool4f.acquire() : null;
+        float[] s11 = subpixel ? pool4f.acquire() : null;
         try {
             float a = inv[0], b = inv[2], c = inv[4];
             float d = inv[1], e = inv[3], f = inv[5];
@@ -285,24 +294,22 @@ public final class PixelBlitter {
                     }
                     srcColor[3] = aSrc;
 
-                    aa.read(blended, dst, worldX + 0.5f, worldY + 0.5f, srcColor);
-                    dstData[dstIdx] = blended[0];
-                    dstData[dstIdx + 1] = blended[1];
-                    dstData[dstIdx + 2] = blended[2];
-                    dstData[dstIdx + 3] = blended[3];
+                    Blends.blendWithPreAlpha(blendMode,
+                            dstData, dstIdx,
+                            dstData, dstIdx,
+                            srcColor, 0);
 
                     srcX += stepX;
                     srcY += stepY;
                 }
             }
         } finally {
-            pool.release(srcColor);
-            pool.release(blended);
+            pool4f.release(srcColor);
             if (subpixel) {
-                pool.release(s00);
-                pool.release(s10);
-                pool.release(s01);
-                pool.release(s11);
+                pool4f.release(s00);
+                pool4f.release(s10);
+                pool4f.release(s01);
+                pool4f.release(s11);
             }
         }
     }
