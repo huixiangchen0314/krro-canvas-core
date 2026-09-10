@@ -37,7 +37,7 @@
         preprocessed  (mapv #(trans/preprocess % opts) root-layers)
         layers         (render/expand-layers preprocessed)
         ^Set dirty-tiles' (or dirty-tiles
-                         (LayerUtils/dirtyTiles canvas-w canvas-h tile-size))
+                         (LayerUtils/canvasTiles tile-size canvas-w canvas-h))
         opts' (assoc opts :dirty-tiles dirty-tiles')]
     (render/render
       (fn [c]

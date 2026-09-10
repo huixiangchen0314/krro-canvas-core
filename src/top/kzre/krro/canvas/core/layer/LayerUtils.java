@@ -12,7 +12,7 @@ public final class LayerUtils {
 
     private LayerUtils() {}
 
-    public static Set<Long> dirtyTiles(int canvasW, int canvasH, int tileSize) {
+    public static Set<Long> canvasTiles(int tileSize, int canvasW, int canvasH) {
         Set<Long> tiles = new HashSet<>();
         int minTx = TiledCanvas.tileX(0, tileSize);
         int maxTx = TiledCanvas.tileX(canvasW - 1, tileSize);
