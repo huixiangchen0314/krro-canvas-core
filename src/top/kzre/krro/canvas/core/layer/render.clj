@@ -8,12 +8,12 @@
     (top.kzre.krro.util.tile TiledCanvas)))
 
 (defonce default-merge-layer-fn
-         (fn [^TiledCanvas canvas layer w h]
+         (fn [^TiledCanvas canvas layer viewport-w viewport-h {:keys [dirty-tiles]}]
            (let [out-canvas (.copy canvas)
                  src-canvas (:canvas layer) ;; layer 现在是 Canvas
                  blend-mode (util/blend-mode-str (:blend-mode layer) :normal)
                  opacity    (float (get layer :opacity 1.0))]
-             (PixelBlitter/blit out-canvas w h src-canvas (:transform layer) blend-mode opacity false)
+             (PixelBlitter/blit out-canvas viewport-w viewport-h src-canvas (:transform layer) blend-mode opacity dirty-tiles false)
              out-canvas)))
 
 (def ^:dynamic *merge-layer* default-merge-layer-fn)
@@ -68,18 +68,18 @@
   参数：
   - f      : 回调函数，接收最终渲染完成的 Canvas，可用于上传、显示或导出。
   - layers : 待渲染的图层列表（扁平或嵌套）。
-  - w/h    : 画布宽度/高度（像素）。
+  - viewport-w/viewport-h    : 画布宽度/高度（像素）。
   - tile-size : 瓦片大小（用于 TiledCanvas 等）。
   - opts   : 选项 map，至少包含 :backend 映射（图层后端标识）和 :viewport 等。
 
   使用方法：
-  1. 调用 (render (fn [canvas] ...) layers w h tile-size opts)
+  1. 调用 (render (fn [canvas] ...) layers viewport-w viewport-h tile-size opts)
   2. 在 f 中处理 canvas（如上传到 JavaFX、保存文件），完成后 canvas 会被自动清理。
   3. 内部递归调用自身，确保所有图层组被正确处理。
 
   注意：此函数假定输入参数（layers, opts）是不可变的，且画布对象通过 COW 共享。
   "
-  [f layers w h tile-size opts]
+  [f layers viewport-w viewport-h tile-size opts]
   ;; 初始目标画布（透明）
   (let [canvas-atom (atom (TiledCanvas. tile-size))
         default-backend (:backend opts :default)
@@ -88,7 +88,7 @@
         ;; 渲染当前批次，返回新画布并释放旧画布
         render-batch*
         (fn [c]
-          (let [c' (render-batch @cur-be c w h @batch opts)] ; 实际渲染批次
+          (let [c' (render-batch @cur-be c viewport-w viewport-h @batch opts)] ; 实际渲染批次
             (when c (.clear c))   ; 释放旧画布所有权
             c'))
         ]
@@ -106,12 +106,12 @@
             (fn [child-canvas]
               ;; 将子组渲染结果合并到目标画布
               (let [merged (merged/make-merged-layer l child-canvas)
-                    new-canvas (*merge-layer* @canvas-atom merged w h)]
+                    new-canvas (*merge-layer* @canvas-atom merged viewport-w viewport-h opts)]
                 (swap! canvas-atom
                        (fn [c]
                          (when c (.clear c))
                          new-canvas))))
-            (:layers l) w h tile-size opts))              ; 递归
+            (:layers l) viewport-w viewport-h tile-size opts))              ; 递归
         ;; 普通图层：按后端分组批次
         (let [be (:backend l default-backend)]
           (if (= @cur-be be)

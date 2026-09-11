@@ -1,6 +1,7 @@
 package top.kzre.krro.canvas.core.layer;
 
 import top.kzre.colorutils.blend.Blends;
+import top.kzre.colorutils.color.RGB;
 import top.kzre.krro.util.math.KMath;
 import top.kzre.krro.util.pool.FloatsHolder;
 import top.kzre.krro.util.pool.FloatsPool;
@@ -28,19 +29,6 @@ public final class PixelBlitter {
 
     private static final float ALPHA_THRESHOLD = 1e-6f;
 
-    // ──────────── 对外 API ────────────
-    public static void blit(TiledCanvas dst, int w, int h, TiledCanvas src,
-                            float[] matrix2d, String blendMode, float opacity) {
-        blit(dst, w, h, src, matrix2d, blendMode, opacity, true);
-    }
-
-    public static void blit(TiledCanvas dst, int canvasW, int canvasH, TiledCanvas src,
-                            float[] matrix2d, String blendMode, float opacity,
-                            boolean subpixel) {
-        blit(dst, canvasW, canvasH, src, matrix2d, blendMode, opacity,
-                AntiAlias.ssaa2x2(), null, subpixel);
-    }
-
     @Deprecated
     public static void blit(TiledCanvas dst, int canvasW, int canvasH, TiledCanvas src,
                             float[] matrix2d, String blendMode, float opacity,
@@ -51,37 +39,30 @@ public final class PixelBlitter {
     public static void blit(TiledCanvas dst, int canvasW, int canvasH, TiledCanvas src,
                             float[] matrix2d, String blendMode, float opacity,
                              Set<Long> dirtyTiles, boolean subpixel) {
-        if (dirtyTiles != null && dirtyTiles.isEmpty()) return;
+        if (dirtyTiles == null) {
+            throw new IllegalArgumentException("dirtyTiles should not be null");
+        }
+
+        if (dirtyTiles.isEmpty()) return;
 
         final int tileSize = dst.getTileSize();
         final int channels = dst.getChannels();
         assert channels == 4;
 
         // 收集所有需要处理的瓦片（若未指定则默认全图）
-        Set<Long> tiles = dirtyTiles;
-        if (tiles == null) {
-            tiles = new HashSet<>();
-            int startTx = TiledCanvas.tileX(0, tileSize);
-            int endTx   = TiledCanvas.tileX(canvasW - 1, tileSize);
-            int startTy = TiledCanvas.tileY(0, tileSize);
-            int endTy   = TiledCanvas.tileY(canvasH - 1, tileSize);
-            for (int ty = startTy; ty <= endTy; ty++)
-                for (int tx = startTx; tx <= endTx; tx++)
-                    tiles.add(TiledCanvas.pack(tx, ty));
-        }
 
         boolean identity = KMath.mat2dIsIdentity(matrix2d);
 
         // 构建任务列表
-        List<RecursiveAction> tasks = new ArrayList<>(tiles.size());
+        List<RecursiveAction> tasks = new ArrayList<>(dirtyTiles.size());
         if (identity) {
-            for (long key : tiles) {
+            for (long key : dirtyTiles) {
                 tasks.add(new BlitTaskIdentity(dst, canvasW, canvasH, src, blendMode, opacity, tileSize, key));
             }
         } else {
             float[] inv = KMath.mat2dInv(matrix2d);
             if (inv == null) return;
-            for (long key : tiles) {
+            for (long key : dirtyTiles) {
                 tasks.add(new BlitTaskTransform(dst, canvasW, canvasH, src, inv, blendMode, opacity,
                         tileSize, subpixel, key));
             }
@@ -136,33 +117,48 @@ public final class PixelBlitter {
             float[] dstData = dstTile.getPixelsForWrite();
             int channels = dst.getChannels();
 
-            FloatsHolder holder = PoolManagers.floats().getHolder();
-            FloatsPool pool = holder.getPool(4);
-            float[] srcPixel = pool.acquire();
-            float[] bgPixel  = pool.acquire();
-            float[] res = pool.acquire();
+            float[] srcPixel = pool4f.acquire();
+            float[] res = pool4f.acquire();
             try {
-                for (int row = 0; row < bh; row++) {
-                    int localY = TiledCanvas.localY(y0 + row, tileSize);
-                    int rowBase = localY * tileSize * channels;
-                    for (int col = 0; col < bw; col++) {
-                        int localX = TiledCanvas.localX(x0 + col, tileSize);
-                        int idx = rowBase + localX * channels;
+                if (opacity >= 1.0f - ALPHA_THRESHOLD
+                        && Blends.NORMAL.equals(blendMode)
+                        && isRegionOpaque(srcData, tileSize, x0, y0, bw, bh)) {
+                    if (bw == tileSize && bh == tileSize) {
+                        // 整 tile：一次 memcpy
+                        System.arraycopy(srcData, 0, dstData, 0, srcData.length);
+                    } else {
+                        // 边缘 tile：逐行 memcpy
+                        int localX0 = TiledCanvas.local(x0, tileSize);
+                        int bytesPerRow = bw * channels;
+                        for (int row = 0; row < bh; row++) {
+                            int localY = TiledCanvas.local(y0 + row, tileSize);
+                            int rowBase = (localY * tileSize + localX0) * channels;
+                            System.arraycopy(srcData, rowBase, dstData, rowBase, bytesPerRow);
+                        }
+                    }
+                }else {
+                    for (int row = 0; row < bh; row++) {
+                        int localY = TiledCanvas.local(y0 + row, tileSize);
+                        int rowBase = localY * tileSize * channels;
+                        for (int col = 0; col < bw; col++) {
+                            int localX = TiledCanvas.local(x0 + col, tileSize);
+                            int idx = rowBase + localX * channels;
 
-                        System.arraycopy(dstData, idx, bgPixel, 0, 4);
-                        System.arraycopy(srcData, idx, srcPixel, 0, 4);
-                        srcPixel[3] *= opacity;
+                            // 原图层不属于我们，必须拷贝
+                            System.arraycopy(srcData, idx, srcPixel, 0, 4);
+                            srcPixel[3] *= opacity;
 
-                        if (srcPixel[3] < ALPHA_THRESHOLD) continue;
+                            if (srcPixel[3] < ALPHA_THRESHOLD) continue;
 
-                        Blends.blendWithAlpha(blendMode,res, bgPixel, srcPixel);
-                        System.arraycopy(res, 0, dstData, idx, 4);
+                            // 原地合成
+                            Blends.blendWithAlpha(blendMode, dstData, idx, dstData, idx, srcPixel, 0);
+                        }
                     }
                 }
+
             }finally {
-                pool.release(srcPixel);
-                pool.release(bgPixel);
-                pool.release(res);
+                pool4f.release(srcPixel);
+                pool4f.release(res);
             }
         }
     }
@@ -171,7 +167,7 @@ public final class PixelBlitter {
     // ──────────── 瓦片并行任务（一般变换） ────────────
     private static final class BlitTaskTransform extends RecursiveAction {
         private final TiledCanvas dst;
-        private final int w, h;
+        private final int canvasW, canvasH;
         private final TiledCanvas src;
         private final float[] inv;
         private final String blendMode;
@@ -180,12 +176,12 @@ public final class PixelBlitter {
         private final boolean subpixel;
         private final long key;
 
-        BlitTaskTransform(TiledCanvas dst, int w, int h, TiledCanvas src,
+        BlitTaskTransform(TiledCanvas dst, int canvasW, int canvasH, TiledCanvas src,
                           float[] inv, String blendMode, float opacity,
                           int tileSize, boolean subpixel, long key) {
             this.dst = dst;
-            this.w = w;
-            this.h = h;
+            this.canvasW = canvasW;
+            this.canvasH = canvasH;
             this.src = src;
             this.inv = inv;
             this.blendMode = blendMode;
@@ -197,7 +193,7 @@ public final class PixelBlitter {
 
         @Override
         protected void compute() {
-            blitGeneral(dst, w, h, src, inv, blendMode, opacity, tileSize, subpixel, key);
+            blitGeneral(dst, canvasW, canvasH, src, inv, blendMode, opacity, tileSize, subpixel, key);
         }
     }
 
@@ -230,7 +226,7 @@ public final class PixelBlitter {
 
             for (int y = 0; y < bh; y++) {
                 int worldY = y0 + y;
-                int localY = TiledCanvas.localY(worldY, tileSize);
+                int localY = TiledCanvas.local(worldY, tileSize);
                 int rowBase = localY * tileSize * channels;
 
                 float srcX = a * (x0 + 0.5f) + b * (worldY + 0.5f) + c;
@@ -240,30 +236,30 @@ public final class PixelBlitter {
 
                 for (int x = 0; x < bw; x++) {
                     int worldX = x0 + x;
-                    int localX = TiledCanvas.localX(worldX, tileSize);
+                    int localX = TiledCanvas.local(worldX, tileSize);
                     int dstIdx = rowBase + localX * channels;
 
                     if (subpixel) {
-                        // ---- 内联双线性采样（从瓦片数组直接读取） ----
+                        // ---- 源画布颜色双线性采样（从瓦片数组直接读取） ----
                         int srcX0 = (int) Math.floor(srcX);
                         int srcY0 = (int) Math.floor(srcY);
                         float fx = srcX - srcX0;
                         float fy = srcY - srcY0;
 
-                        // 读取四个角点（快速瓦片访问）
+                        // 读取源画布四个角点（快速瓦片访问）
                         readPixelFast(src, srcX0, srcY0, s00);
                         readPixelFast(src, srcX0 + 1, srcY0, s10);
                         readPixelFast(src, srcX0, srcY0 + 1, s01);
                         readPixelFast(src, srcX0 + 1, srcY0 + 1, s11);
 
                         // 预乘
-                        premultiply(s00);
-                        premultiply(s10);
-                        premultiply(s01);
-                        premultiply(s11);
+                        RGB.preMultiAlpha(s00);
+                        RGB.preMultiAlpha(s10);
+                        RGB.preMultiAlpha(s01);
+                        RGB.preMultiAlpha(s11);
 
                         if (s00[3] == 0 && s10[3] == 0 && s01[3] == 0 && s11[3] == 0) {
-                            srcColor[0] = srcColor[1] = srcColor[2] = srcColor[3] = 0f;
+                            Arrays.fill(srcColor, 0f);
                         } else {
                             for (int i = 0; i < 4; i++) {
                                 float top = s00[i] + (s10[i] - s00[i]) * fx;
@@ -271,15 +267,7 @@ public final class PixelBlitter {
                                 srcColor[i] = top + (bot - top) * fy;
                             }
                             // 插值后反预乘，恢复 straight alpha
-                            float aCol = srcColor[3];
-                            if (aCol > 1e-6f) {
-                                float invA = 1.0f / aCol;
-                                srcColor[0] *= invA;
-                                srcColor[1] *= invA;
-                                srcColor[2] *= invA;
-                            } else {
-                                Arrays.fill(srcColor, 0f);
-                            }
+                            RGB.invPreMultiAlpha(srcColor);
                         }
                     } else {
                         // 最近邻采样
@@ -296,10 +284,19 @@ public final class PixelBlitter {
                     }
                     srcColor[3] = aSrc;
 
-                    Blends.blendWithAlpha(blendMode,
-                            dstData, dstIdx,
-                            dstData, dstIdx,
-                            srcColor, 0);
+                    // ═══════════ 快路径：覆盖 ═══════════
+                    if (aSrc >= 1.0f - ALPHA_THRESHOLD && Blends.NORMAL.equals(blendMode)) {
+                        System.arraycopy(srcColor, 0, dstData, dstIdx, 3);
+                        dstData[dstIdx + 3] = 1.0f;
+                    } else {
+                        // ═══════════ 慢路径 ═══════════
+                        srcColor[3] = aSrc;
+                        Blends.blendWithAlpha(blendMode,
+                                dstData, dstIdx,
+                                dstData, dstIdx,
+                                srcColor, 0);
+                    }
+
 
                     srcX += stepX;
                     srcY += stepY;
@@ -321,38 +318,42 @@ public final class PixelBlitter {
      */
     private static void readPixelFast(TiledCanvas canvas, int x, int y, float[] out) {
         if (x < 0 || y < 0) {
-            out[0] = out[1] = out[2] = out[3] = 0f;
+            Arrays.fill(out, 0);
             return;
         }
         int tileSize = canvas.getTileSize();
-        int tx = TiledCanvas.tileX(x, tileSize);
-        int ty = TiledCanvas.tileY(y, tileSize);
+        int tx = TiledCanvas.tile(x, tileSize);
+        int ty = TiledCanvas.tile(y, tileSize);
         Tile tile = canvas.getTile(tx, ty);
         if (tile == null) {
-            out[0] = out[1] = out[2] = out[3] = 0f;
+            Arrays.fill(out, 0f);
             return;
         }
         float[] data = tile.getPixelsSnapshot();
-        int lx = TiledCanvas.localX(x, tileSize);
-        int ly = TiledCanvas.localY(y, tileSize);
+        int lx = TiledCanvas.local(x, tileSize);
+        int ly = TiledCanvas.local(y, tileSize);
         int idx = (ly * tileSize + lx) * 4;
-        out[0] = data[idx];
-        out[1] = data[idx + 1];
-        out[2] = data[idx + 2];
-        out[3] = data[idx + 3];
+        System.arraycopy(data, idx, out, 0, 4);
     }
-
-
-    private static void premultiply(float[] pixel) {
-        if (pixel.length >= 4) {
-            float a = pixel[3];
-            if (a < 1e-6f) {
-                pixel[0] = pixel[1] = pixel[2] = pixel[3] = 0f;
-            } else {
-                pixel[0] *= a;
-                pixel[1] *= a;
-                pixel[2] *= a;
+    /**
+     * 检测源 tile 在指定区域内是否完全不透明（alpha ≥ 1 - ε）。
+     * 只扫描有效区域（边缘 tile 不会扫全 tile）。
+     *
+     * 若命中第一个半透明像素立即返回 false，半透明 tile 检测很快。
+     * 不透明 tile 需要扫完整个区域，但之后可走 memcpy 快路径。
+     */
+    private static boolean isRegionOpaque(float[] data, int tileSize,
+                                          int x0, int y0, int bw, int bh) {
+        int localX0 = TiledCanvas.local(x0, tileSize);
+        for (int row = 0; row < bh; row++) {
+            int localY = TiledCanvas.local(y0 + row, tileSize);
+            int rowBase = localY * tileSize * 4;
+            int startIdx = rowBase + localX0 * 4 + 3;
+            int endIdx = startIdx + bw * 4;
+            for (int i = startIdx; i < endIdx; i += 4) {
+                if (data[i] < 1.0f - ALPHA_THRESHOLD) return false;
             }
         }
+        return true;
     }
 }

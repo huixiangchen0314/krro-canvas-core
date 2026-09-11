@@ -36,20 +36,27 @@
    & {:keys [dirty-tiles
              ;; 图像矩形范围，
              image-x image-y image-w image-h
+             ;; 视口变换仿射矩阵
+             viewport
              ]
       :as opts}]
   (let [tile-size (.getTileSize canvas)
         preprocessed  (mapv #(trans/preprocess % opts) root-layers)
         layers         (render/expand-layers preprocessed)
-        ^Set dirty-tiles' (or dirty-tiles
+        ;; 补全脏矩形，裁剪脏矩形到视口
+        dirty-tiles' (or (when dirty-tiles (LayerUtils/clipTiles dirty-tiles tile-size viewport-w viewport-h))
                          (LayerUtils/canvasTiles tile-size viewport-w viewport-h))
-        opts' (assoc opts :dirty-tiles dirty-tiles')]
+        ;; 渲染的脏矩形裁剪到图像，如果提供了图像范围
+        render-dirties (if (and image-x image-y image-w image-h)
+                         (LayerUtils/clipTiles image-x image-y image-w image-h)
+                         dirty-tiles')
+        opts' (assoc opts :dirty-tiles render-dirties)]
     (profile
       {:id :render-layers-pass}
       (p :render-layers-pass
         (render/render
           (fn [c]
             (log/debug  "rendered tiles")
-            (.deleteTiles canvas dirty-tiles')
+            (.deleteTiles canvas ^Set  dirty-tiles')
             (.mergeCanvas canvas c))
           layers viewport-w viewport-h tile-size opts')))))
