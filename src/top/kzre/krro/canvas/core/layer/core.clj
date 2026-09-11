@@ -4,6 +4,7 @@
    批次渲染由 flush-batch! 多方法根据 :backend 分派。"
   (:require
    [taoensso.timbre :as log]
+   [taoensso.tufte :refer [profile p]]
    [top.kzre.krro.canvas.core.layer.render :as render]
    [top.kzre.krro.canvas.core.layer.spec]
    [top.kzre.krro.canvas.core.layer.transform :as trans]
@@ -26,22 +27,29 @@
 (def parent-container util/parent-container)
 
 (defn render-layers!
-  "渲染图层树到目标画布。
+  "渲染图层树到目标画布(预乘视口变换)。
    root-layers : 根图层列表（已预处理）
    canvas      : 目标画布 (TiledCanvas)
-   canvas-w, canvas-h        : 画布宽度、高度（像素）
+   viewport-w, viewport-h        : 画布宽度、高度（像素）
    opts        : 透传选项（如 :dirty-tiles, :tile-size）"
-  [root-layers ^TiledCanvas canvas canvas-w canvas-h & {:keys [dirty-tiles]
-                                                        :as opts}]
+  [root-layers ^TiledCanvas canvas viewport-w viewport-h
+   & {:keys [dirty-tiles
+             ;; 图像矩形范围，
+             image-x image-y image-w image-h
+             ]
+      :as opts}]
   (let [tile-size (.getTileSize canvas)
         preprocessed  (mapv #(trans/preprocess % opts) root-layers)
         layers         (render/expand-layers preprocessed)
         ^Set dirty-tiles' (or dirty-tiles
-                         (LayerUtils/canvasTiles tile-size canvas-w canvas-h))
+                         (LayerUtils/canvasTiles tile-size viewport-w viewport-h))
         opts' (assoc opts :dirty-tiles dirty-tiles')]
-    (render/render
-      (fn [c]
-        (log/debug  "rendered tiles")
-        (.deleteTiles canvas dirty-tiles')
-        (.mergeCanvas canvas c))
-      layers canvas-w canvas-h tile-size opts')))
+    (profile
+      {:id :render-layers-pass}
+      (p :render-layers-pass
+        (render/render
+          (fn [c]
+            (log/debug  "rendered tiles")
+            (.deleteTiles canvas dirty-tiles')
+            (.mergeCanvas canvas c))
+          layers viewport-w viewport-h tile-size opts')))))
