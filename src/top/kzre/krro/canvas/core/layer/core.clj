@@ -52,7 +52,7 @@
         composed  (if transform-composed?
                     layers
                     (mapv #(trans/compose-transforms % :viewport viewport) layers))
-        expanded         (mapv group/pass-through composed)
+        throughed         (mapv group/pass-through composed)
         viewport-dirty-tiles
         (or viewport-dirty-tiles
             (if (and dirty-tiles viewport)
@@ -84,4 +84,4 @@
           (fn [c]
             (.deleteTiles canvas ^Set  view-clipped-dirty-tiles)
             (.mergeCanvas canvas c))
-          expanded viewport-w viewport-h tile-size opts')))))
+          throughed viewport-w viewport-h tile-size opts')))))
