@@ -1,6 +1,5 @@
 (ns top.kzre.krro.canvas.core.layer.render
   (:require
-    [top.kzre.krro.canvas.core.layer.group :as group]
     [top.kzre.krro.canvas.core.layer.merged :as merged]
     [top.kzre.krro.canvas.core.layer.util :as util])
   (:import
@@ -34,26 +33,12 @@
     out-canvas))
 
 (defmethod render-layer! :default
-  [layer _ _ _ _ _]
+  [layer _ _ _ _]
   (throw (ex-info (str "No render-layer! implementation for type: " (:type layer))
                   {:layer layer})))
 
 
-;; ── 展开图层树 ──────────────────────────────────
-(defn expand-layers
-  [layers]
-  (mapcat (fn [layer]
-            (when (:visible layer true)
-              (if (group/group? layer)
-                (if (util/pass-through? layer)
-                  (expand-layers (:layers layer))
-                  [(update layer :layers expand-layers)])
-                [layer])))
-          layers))
-
 ;; ── 组渲染 ──────────────────────────────────────
-(declare render-children!)
-
 
 (defn render
   "渲染图层列表到目标画布，并应用回调 f 进行最终处理。

@@ -3,12 +3,13 @@
    内部使用 :batch-item 与 :merged 两种中间表示，
    批次渲染由 flush-batch! 多方法根据 :backend 分派。"
   (:require
-   [taoensso.timbre :as log]
-   [taoensso.tufte :refer [profile p]]
-   [top.kzre.krro.canvas.core.layer.render :as render]
-   [top.kzre.krro.canvas.core.layer.spec]
-   [top.kzre.krro.canvas.core.layer.transform :as trans]
-   [top.kzre.krro.canvas.core.layer.util :as util])
+    [taoensso.tufte :refer [p profile]]
+    [top.kzre.krro.canvas.core.layer.render.core]
+    [top.kzre.krro.canvas.core.layer.group :as group]
+    [top.kzre.krro.canvas.core.layer.render :as render]
+    [top.kzre.krro.canvas.core.layer.spec]
+    [top.kzre.krro.canvas.core.layer.transform :as trans]
+    [top.kzre.krro.canvas.core.layer.util :as util])
   (:import
    [java.util Set]
    (top.kzre.krro.canvas.core.layer LayerUtils)
@@ -50,7 +51,7 @@
         composed  (if transform-composed?
                     layers
                     (mapv #(trans/compose-transforms % :viewport viewport) layers))
-        expanded         (render/expand-layers composed)
+        expanded         (mapv group/pass-through composed)
         viewport-dirty-tiles
         (or viewport-dirty-tiles
             (if (and dirty-tiles viewport)

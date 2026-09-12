@@ -1,6 +1,8 @@
 (ns top.kzre.krro.canvas.core.layer.group
   "图层组操作：创建、修改子图层，封装内部向量。"
-  (:import (java.util UUID)))
+  (:import
+    (java.util UUID)
+    (top.kzre.krro.util.math KMath)))
 
 (defn make-layer-group
   "创建一个图层组。ID 默认为 UUID 字符串。"
@@ -54,3 +56,34 @@
   "返回子图层数量。"
   [group]
   (count (:layers group)))
+
+
+
+
+(defn pass-through?
+  "判断图层是否为直通组（其子图层直接穿透到父级）。
+   条件：:blend-mode 为 nil 或 :pass-through。"
+  [layer]
+  (and
+    ;; 图层组
+    (:group (:type layer))
+    ;; 无特殊混合模式
+    (let [bm (:blend-mode layer)]
+      (or (nil? bm) (= :pass-through bm)))
+    ;; TODO 不透明度判断
+    ;; 标准变换
+    ;; TODO  合并变换并穿透
+    (let [trans (:transform layer)]
+      (and trans
+           (KMath/mat2dIsIdentity trans)))
+    ))
+
+(defn pass-through
+  "穿透单图层，返回新图层"
+  [layer]
+  (when (:visible layer true)
+    (if (group? layer)
+      (if (pass-through? layer)
+        (pass-through (:layers layer))
+        (update layer :layers pass-through))
+      layer)))

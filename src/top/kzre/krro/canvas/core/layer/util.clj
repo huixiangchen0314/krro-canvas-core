@@ -81,22 +81,7 @@
 
 
 ;; ── 直通组判断 ────────────────────────────────────
-(defn pass-through?
-  "判断图层是否为直通组（其子图层直接穿透到父级）。
-   条件：:blend-mode 为 nil 或 :pass-through。"
-  [layer]
-  (and
-    ;; 图层组
-    (:group (:type layer))
-    ;; 无特殊混合模式
-    (let [bm (:blend-mode layer)]
-      (or (nil? bm) (= :pass-through bm)))
-    ;; 标准变换
-    (let [trans (:transform layer)]
-      (and trans
-           (or (= trans util/identity-matrix)
-               (KMath/mat2dIsIdentity trans))))
-    ))
+
 
 ;; ── 缓冲区分配 ────────────────────────────────────
 (defn allocate-data
