@@ -17,10 +17,13 @@
 
    清理策略：
      - 正常流：每个中间画布在链上被显式 .clear。
-     - 异常流：所有 GroupBatch 拥有的画布登记到 gabages，失败时统一 .clear。
+     - 异常流：所有 GroupBatch 拥有的画布登记到 canvas-tracker；
+       失败时调用 fail! 统一清理。tracker 的 track! / fail! 通过 CAS 互斥，
+       保证『fail! 之后才到达的 track!』也能立即自清，无泄漏窗口。
      - 前提：TiledCanvas.clear 幂等、可重入。
    "
   (:require
+    [top.kzre.krro.canvas.core.layer.render.canvas-tracker :as canvas-tracker]
     [top.kzre.krro.canvas.core.layer.render.merge :as merge]
     [top.kzre.krro.canvas.core.layer.render.merged :as merged]
     [top.kzre.krro.core.util.promise :as promise])
@@ -130,12 +133,10 @@
     (let [merge-fn  merge/*merge-layers*
           tile-size (.getTileSize backdrop-canvas)
 
-          ;; GroupBatch 拥有的画布登记表。仅服务于失败路径：
-          ;; 成功路径下每个中间画布已在链上被显式 .clear，此表只是兜底。
-          gabages   (atom [])
-          track!    (fn [^TiledCanvas c]
-                      (when c (swap! gabages conj c))
-                      c)
+          ;; 画布追踪器：登记 GroupBatch 拥有的全部画布。
+          ;; 正常流下每个中间画布已在链上被 .clear，此表仅服务于失败路径。
+          tracker   (canvas-tracker/tracker)
+          track!    #(canvas-tracker/track! tracker %)
           new-canvas-fn #(track! (TiledCanvas. tile-size))
 
           step (fn [pacc batch]
@@ -149,6 +150,8 @@
 
           finalize
           (fn [[layer-promises ^TiledCanvas backdrop]]
+            ;; 先把累积的 Promise 解析成实际图层再 merge，
+            ;; 否则 merge-fn 收到的是 Promise 向量，clear-layers! 也会拿不到 :canvas
             (-> (promise/all layer-promises)
                 (promise/then
                   (fn [layers]
@@ -160,10 +163,10 @@
                               (.clear backdrop)
                               (merged/make-merged-layer group merged-canvas)
                               (catch Throwable e
-                                ;; 失败：清理画布，重新抛出异常
+                                ;; 失败：清理输出画布，重新抛出异常
                                 (.clear merged-canvas)
-                                (throw e))))))))))
-          ]
+                                (throw e))))))))))]
+
       (-> (reduce step
                   (promise/resolved [[] (track! (.copy backdrop-canvas))])
                   batches)
@@ -172,10 +175,9 @@
             (fn [v e]
               (if e
                 (do
-                  (run! (fn [^TiledCanvas c]
-                          (try (.clear c)
-                               (catch Throwable _ nil)))   ; 回收失败不掩盖原异常
-                        @gabages)
+                  ;; 原子失败：清掉此刻已登记的画布，
+                  ;; 并置失败态，使之后到达的 track! 立即自清
+                  (canvas-tracker/fail! tracker)
                   (throw e))
                 v)))))))
 
