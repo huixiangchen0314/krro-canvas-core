@@ -11,7 +11,7 @@
             (:type layer)))
 
 (defmethod composite-layer :default
-  [layer _]
+  [layer & _]
   (promise/rejected
     (ex-info (str "No composite-layer implementation for type: " (:type layer))
              {:layer-id (:id layer)
