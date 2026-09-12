@@ -25,22 +25,14 @@
 ;; 默认逐个合成图层
 (defmethod batch/render-batch :default
   [_ backdrop layers opts]
-  (let [canvas (.copy backdrop)]           ; 唯一一次 copy：把外部 backdrop 变成本批次拥有的
-    (-> (reduce
-          (fn [p layer]
-            (promise/then p
-                          (fn [^TiledCanvas c]
-                            ;; composite 原地写 c，返回 c
-                            (composite/composite-layer layer c opts))))
-          (promise/resolved canvas)
-          layers)
-        (promise/handle
-          (fn [c e]
-            (if e
-              (do
-                (try (.clear canvas) (catch Throwable _ nil))  ; 失败才清
-                (throw e))
-              c))))))                                        ; 成功返回同一 canvas
+  (reduce
+    (fn [p layer]
+      (promise/then p
+                    (fn [^TiledCanvas c]
+                      ;; composite 原地写 c，返回 c
+                      (composite/composite-layer layer c opts))))
+    (promise/resolved backdrop)
+    layers)) ; 成功返回同一 canvas
 
 
 
