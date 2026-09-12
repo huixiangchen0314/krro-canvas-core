@@ -60,17 +60,25 @@ public final class LayerUtils {
      */
     public static Set<Long> clipTiles(Set<Long> tiles, int tileSize,
                                       float x, float y, float width, float height) {
+        return clipTilesAABB(tiles, tileSize, x, y, x + width, y + height);
+    }
+
+    /**
+     * 仅保留与 (0,0) 为起点、宽高为 width×height 的矩形相交的瓦片。
+     */
+    public static Set<Long> clipTiles(Set<Long> tiles, int tileSize,
+                                      float width, float height) {
+        return clipTilesAABB(tiles, tileSize, 0f, 0f, width, height);
+    }
+
+    public static Set<Long> clipTilesAABB(Set<Long> tiles, int tileSize,
+                                      float minX, float minY, float maxX, float maxY) {
         if(tiles == null){
             return  null;
         }
         if (tiles.isEmpty()) {
             return new HashSet<>();
         }
-        float clipLeft = x;
-        float clipRight = x + width;
-        float clipTop = y;          // y 轴向下
-        float clipBottom = y + height;
-
         Set<Long> result = new HashSet<>();
         for (Long key : tiles) {
             int tx = TiledCanvas.unpackTx(key);
@@ -81,20 +89,12 @@ public final class LayerUtils {
             float tileBottom = tileTop + tileSize;
 
             // 检查矩形是否有交集（不包含仅边界相切的情况）
-            if (tileLeft < clipRight && tileRight > clipLeft &&
-                    tileTop < clipBottom && tileBottom > clipTop) {
+            if (tileLeft < maxX && tileRight > minX &&
+                    tileTop < maxY && tileBottom > minY) {
                 result.add(key);
             }
         }
         return result;
-    }
-
-    /**
-     * 仅保留与 (0,0) 为起点、宽高为 width×height 的矩形相交的瓦片。
-     */
-    public static Set<Long> clipTiles(Set<Long> tiles, int tileSize,
-                                      float width, float height) {
-        return clipTiles(tiles, tileSize, 0f, 0f, width, height);
     }
 
     public static Set<Long> transformTiles(
