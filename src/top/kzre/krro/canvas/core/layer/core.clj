@@ -33,30 +33,47 @@
    viewport-w, viewport-h        : 画布宽度、高度（像素）
    opts        : 透传选项（如 :dirty-tiles, :tile-size）"
   [root-layers ^TiledCanvas canvas viewport-w viewport-h
-   & {:keys [dirty-tiles
+   & {:keys [
+             ;; 脏瓦片，前者表示世界空间脏瓦片，如果外部希望直接处理好脏瓦片，也可以直接传入视口空间的脏瓦片
+             dirty-tiles
+             viewport-dirty-tiles
              ;; 图像矩形范围，
-             image-x image-y image-w image-h
+             image-width image-height
              ;; 视口变换仿射矩阵
              viewport
              ]
       :as opts}]
   (let [tile-size (.getTileSize canvas)
-        preprocessed  (mapv #(trans/preprocess % opts) root-layers)
-        layers         (render/expand-layers preprocessed)
+        composed  (mapv #(trans/compose-transforms % :viewport viewport) root-layers)
+        layers         (render/expand-layers composed)
+        viewport-dirty-tiles
+        (if viewport
+          (or
+            viewport-dirty-tiles
+            (when dirty-tiles
+              (LayerUtils/transformTiles dirty-tiles tile-size viewport)))
+          dirty-tiles)
+
         ;; 补全脏矩形，裁剪脏矩形到视口
-        dirty-tiles' (or (when dirty-tiles (LayerUtils/clipTiles dirty-tiles tile-size viewport-w viewport-h))
-                         (LayerUtils/canvasTiles tile-size viewport-w viewport-h))
+        view-clipped-dirty-tiles
+        (or
+          (when viewport-dirty-tiles
+            (LayerUtils/clipTiles viewport-dirty-tiles tile-size viewport-w viewport-h))
+          (LayerUtils/canvasTiles tile-size viewport-w viewport-h))
+
         ;; 渲染的脏矩形裁剪到图像，如果提供了图像范围
-        render-dirties (if (and image-x image-y image-w image-h)
-                         (LayerUtils/clipTiles image-x image-y image-w image-h)
-                         dirty-tiles')
-        opts' (assoc opts :dirty-tiles render-dirties)]
+        image-clipped-dirty-tiles
+        (if (and image-width image-height)
+          (let [{:keys [x y]} (util/transform-point viewport 0 0)]
+            (LayerUtils/clipTiles view-clipped-dirty-tiles tile-size x y image-width image-height))
+          view-clipped-dirty-tiles)
+        opts' (assoc opts :dirty-tiles image-clipped-dirty-tiles)]
     (profile
       {:id :render-layers-pass}
       (p :render-layers-pass
         (render/render
           (fn [c]
             (log/debug  "rendered tiles")
-            (.deleteTiles canvas ^Set  dirty-tiles')
+            (.deleteTiles canvas ^Set  view-clipped-dirty-tiles)
             (.mergeCanvas canvas c))
           layers viewport-w viewport-h tile-size opts')))))
