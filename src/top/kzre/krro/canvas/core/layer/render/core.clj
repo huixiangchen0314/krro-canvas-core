@@ -45,33 +45,39 @@
    连续同后端图层 → BackendBatch
    :group 类型图层 → GroupBatch（递归构建其子批次）"
   [layers default-backend opts]
-  (loop [remaining (seq layers)
-         result    []
-         cur-be    nil
-         cur-batch []]
-    (if-not remaining
-      (cond-> result
-              (seq cur-batch) (conj (batch/backend-batch cur-be cur-batch)))
-      (let [l (first remaining)]
-        (if (group/group? l)
-          ;; 组图层：先 flush 当前批次，再递归构建子批次
-          (recur (rest remaining)
-                 (cond-> result
-                         (seq cur-batch) (conj (batch/backend-batch cur-be cur-batch))
-                         true            (conj (batch/group-batch
-                                                 l
-                                                 (build-batches (:layers l) default-backend opts))))
-                 nil
-                 [])
-          ;; 普通图层：按后端分组
-          (let [be (:backend l default-backend)]
-            (if (= be cur-be)
-              (recur (rest remaining) result cur-be (conj cur-batch l))
-              (recur (rest remaining)
-                     (cond-> result
-                             (seq cur-batch) (conj (batch/backend-batch cur-be cur-batch)))
-                     be
-                     [l]))))))))
+  (if-not (seq layers)
+    []
+    (loop [remaining layers
+           result    []
+           cur-be    nil
+           cur-batch []]
+      (if-not (seq remaining)
+        (if (seq cur-batch)
+          (cond-> result
+                  (seq cur-batch) (conj (batch/backend-batch cur-be cur-batch)))
+          result)
+        (let [l (first remaining)]
+          (if (group/group? l)
+            ;; 组图层：先 flush 当前批次，再递归构建子批次
+            (recur (rest remaining)
+                   (cond-> result
+                           (seq cur-batch) (conj (batch/backend-batch cur-be cur-batch))
+                           true            (conj (batch/group-batch
+                                                   l
+                                                   (build-batches (:layers l) default-backend opts))))
+                   nil
+                   [])
+            ;; 普通图层：按后端分组
+            (let [be (:backend l default-backend)]
+              (if (= be cur-be)
+                (recur (rest remaining) result cur-be (conj cur-batch l))
+                (recur (rest remaining)
+                       (if (seq cur-batch)
+                         (cond-> result
+                                 (seq cur-batch) (conj (batch/backend-batch cur-be cur-batch)))
+                         result)
+                       be
+                       [l])))))))))
 
 (defn build-batch
   "从图层列表构建顶层批次向量。

@@ -147,14 +147,14 @@
   [backend    ;; keyword  后端标识（:cpu / :gl / :default）
    layers]    ;; vector   同 backend 的图层列表
   IBatch
-  (render [_ ^TiledCanvas backdrop-canvas opts]
+  (render [_ backdrop-canvas opts]
     (-> (render-batch backend backdrop-canvas layers opts)
         (promise/fmap merged/make-merged-layer))))
 
 (defrecord GroupBatch
   [group batches]
   IBatch
-  (render [_ ^TiledCanvas backdrop-canvas opts]
+  (render [_ backdrop-canvas opts]
     (let [merge-fn  merge/*merge-layers*
           tile-size (.getTileSize backdrop-canvas)
 
