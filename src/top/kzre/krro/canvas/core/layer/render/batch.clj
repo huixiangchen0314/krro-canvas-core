@@ -76,7 +76,9 @@
 (defn- clear-layer-canvas!
   [layer]
   (when-let [^TiledCanvas canvas (:canvas layer)]
-    (.clear canvas)))
+    (try
+      (.clear canvas)
+      (catch Throwable _ nil))))
 
 (defn- clear-layers!
   [layers]
@@ -191,7 +193,9 @@
                               (catch Throwable e
                                 ;; 失败：清理输出画布。若 merged-canvas == backdrop，
                                 ;; 它已在 tracker 里；下面的 fail! 会再清一次（幂等无害）。
-                                (.clear merged-canvas)
+                                ;; 清理输出画布——若清理本身抛异常，吞掉不遮蔽原始异常
+                                (try (.clear ^TiledCanvas merged-canvas)
+                                     (catch Throwable _ nil))
                                 (throw e))))))))))]
 
       (-> (reduce step
