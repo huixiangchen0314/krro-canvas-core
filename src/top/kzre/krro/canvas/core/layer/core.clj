@@ -44,7 +44,7 @@
    返回 Promise<Canvas>：渲染完成时解析为目标 view-canvas。
    中间画布由 core/render 内部处理（含失败清理）；
    本函数只额外负责把结果合并回目标 view-canvas 并释放结果画布。"
-  [layers ^TiledCanvas view-canvas
+  [layers
    & {:keys [view-width view-height
              view-matrix
              dirty-tiles
@@ -54,9 +54,7 @@
              tile-size]
       :or   {transform-composed? false}
       :as   opts}]
-  (let [tile-size (or tile-size (.getTileSize view-canvas))
-
-        ;; 1) 预处理：把图层变换合成到视口坐标
+  (let [;; 1) 预处理：把图层变换合成到视口坐标
         composed  (if transform-composed?
                     layers
                     (mapv #(trans/compose-transforms % :viewport view-matrix) layers))
@@ -98,14 +96,21 @@
           {:id :render-layers-pass}
           (p :render-layers-pass
              (render/render throughed opts')))
-        (promise/handle
-          (fn [result-canvas e]
-            (if e
-              (throw e)
-              (do
-                ;; 结果落回目标画布
-                (.deleteTiles view-canvas ^Set view-clipped-dirty-tiles)
-                (.mergeCanvas view-canvas result-canvas)
-                ;; result-view-canvas 所有权在本函数，合并后不再需要，释放
-                (.clear result-canvas)
-                view-canvas)))))))
+        (promise/fmap
+          (fn [canvas]
+            {:canvas canvas
+             :dirty-tiles image-clipped-dirty-tiles
+             }))
+        ;; 直接返回差分画布
+        ;(promise/handle
+        ;  (fn [result-canvas e]
+        ;    (if e
+        ;      (throw e)
+        ;      (do
+        ;        ;; 结果落回目标画布
+        ;        (.deleteTiles view-canvas ^Set view-clipped-dirty-tiles)
+        ;        (.mergeCanvas view-canvas result-canvas)
+        ;        ;; result-view-canvas 所有权在本函数，合并后不再需要，释放
+        ;        (.clear result-canvas)
+        ;        view-canvas))))
+        )))
