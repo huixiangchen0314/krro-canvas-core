@@ -57,25 +57,21 @@
   [group]
   (count (:layers group)))
 
-
+(defn layers
+  [group]
+  (or (:layers group) []))
 
 
 (defn pass-through?
   "判断图层是否为直通组（其子图层直接穿透到父级）。
-   条件：:blend-mode 为 nil 或 :pass-through。"
+   条件：:blend-mode 为 nil 或 :pass-through :normal。"
   [layer]
   (and
     ;; 图层组
-    (:group (:type layer))
+    (= :group (:type layer))
     ;; 无特殊混合模式
     (let [bm (:blend-mode layer)]
-      (or (nil? bm) (= :pass-through bm)))
-    ;; TODO 不透明度判断
-    ;; 标准变换
-    ;; TODO  合并变换并穿透
-    (let [trans (:transform layer)]
-      (and trans
-           (KMath/mat2dIsIdentity trans)))
+      (or (nil? bm) (= :pass-through bm) (= :normal bm)))
     ))
 
 (defn pass-through

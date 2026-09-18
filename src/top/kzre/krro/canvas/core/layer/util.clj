@@ -7,6 +7,16 @@
   (:import
     (top.kzre.krro.util.math KMath)))
 
+(defn normal-blend-mode?
+  "图层是否使用 normal 合成（nil 视为 normal）。
+
+   非 normal 合成（multiply、screen 等）会打断连续 normal 分段——
+   因为它们的合成不可结合。
+
+   参数是图层或组——只读 :blend-mode 字段。"
+  [layer]
+  (let [bm (:blend-mode layer)]
+    (or (nil? bm) (= :normal bm))))
 
 
 (defn ->string
