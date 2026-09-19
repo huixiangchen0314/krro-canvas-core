@@ -329,3 +329,24 @@
       (if-let [last-child (last-child-path layers p)]
         (recur last-child)
         p))))
+
+
+
+(defn insert-layer
+  "在图层列表 layers 的指定路径处插入 layer。返回新的图层向量。
+   path 为索引向量，如 [2] 表示根索引 2，[2 0] 表示组内索引。
+   空路径表示插入到末尾。"
+  [layers path layer]
+  (if (seq path)
+    (let [idx (last path)
+          parent-path (butlast path)]
+      (if (seq parent-path)
+        ;; 有父路径：找到父组，递归更新其内部
+        (let [parent-idx (first parent-path)
+              parent (nth layers parent-idx)
+              new-parent (assoc parent :layers (insert-layer (rest path) layer (:layers parent)))]
+          (assoc layers parent-idx new-parent))
+        ;; 直接根级插入
+        (vec (concat (subvec layers 0 idx) [layer] (subvec layers idx)))))
+    ;; 空路径：插入到末尾
+    (conj (vec layers) layer)))
