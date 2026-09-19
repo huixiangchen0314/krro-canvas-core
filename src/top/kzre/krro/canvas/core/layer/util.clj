@@ -3,7 +3,8 @@
    以及临时缓冲区分配和 Alpha 提取。"
   (:require
    [top.kzre.krro.canvas.core.layer.group :as group]
-   [top.kzre.krro.canvas.core.layer.util :as util])
+   [top.kzre.krro.canvas.core.layer.util :as util]
+   [top.kzre.krro.canvas.core.layer.path :as path])
   (:import
     (top.kzre.krro.util.math KMath)))
 
@@ -306,7 +307,7 @@
    layers     - 顶层图层列表
    返回 float-array 长度 6，若当前图层为根级图层（无父级）则返回 nil。"
   [layer-path layers]
-  (let [parent-path (butlast layer-path)]
+  (let [parent-path (path/parent layer-path)]
     (if (seq parent-path)
       (layer-transform parent-path layers)
       identity-matrix)))

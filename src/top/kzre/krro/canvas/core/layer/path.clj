@@ -1,5 +1,6 @@
 (ns top.kzre.krro.canvas.core.layer.path
   "图层路径：图层或图层组在图层树中的位置标识。
+   基础模块，被其他模块依赖，但不依赖别人。
 
    路径是索引向量，如 [2 0] 表示根列表第 2 个图层的第 0 个子图层。
    空向量 [] 表示根容器本身。
@@ -350,3 +351,40 @@
         (vec (concat (subvec layers 0 idx) [layer] (subvec layers idx)))))
     ;; 空路径：插入到末尾
     (conj (vec layers) layer)))
+
+
+(defn remove-layer
+  "从图层列表 layers 的指定路径移除图层。返回 [new-layers removed-layer]。
+   path 为索引向量。"
+  [layers path]
+  (when (seq path)
+    (let [idx (last path)
+          parent-path (butlast path)]
+      (if (seq parent-path)
+        ;; 嵌套：找到父组，递归删除
+        (let [parent-idx (first parent-path)
+              parent (nth layers parent-idx)
+              [new-children removed] (remove-layer (rest path) (:layers parent))
+              new-parent (assoc parent :layers new-children)
+              new-layers (assoc layers parent-idx new-parent)]
+          [new-layers removed])
+        ;; 根级删除
+        (let [removed (nth layers idx)
+              new-layers (vec (concat (subvec layers 0 idx) (subvec layers (inc idx))))]
+          [new-layers removed])))))
+
+
+
+(defn move-layer
+  "将图层从 old-path 移动到 new-path，返回新的图层列表。
+   old-path 和 new-path 均为索引向量。"
+  [layers old-path new-path]
+  (when (and (seq old-path) (seq new-path))
+    (let [[temp-layers removed] (remove-layer old-path layers)
+          same-parent? (= (butlast old-path) (butlast new-path))
+          old-idx (last old-path)
+          new-idx (last new-path)
+          adjusted-new-path (if (and same-parent? (< old-idx new-idx))
+                              (conj (butlast new-path) (dec new-idx))
+                              new-path)]
+      (insert-layer adjusted-new-path removed temp-layers))))

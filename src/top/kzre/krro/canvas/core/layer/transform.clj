@@ -1,8 +1,57 @@
 (ns top.kzre.krro.canvas.core.layer.transform
   (:require
     [top.kzre.krro.canvas.core.layer.group :as group]
-    [top.kzre.krro.canvas.core.layer.util :as util])
+    [top.kzre.krro.canvas.core.layer.path :as path])
   (:import (top.kzre.krro.util.math KMath)))
+
+(defonce ^:private identity-matrix (KMath/mat2dIdentity))
+
+(defn local-transform
+  "从图层 map 提取变换参数，委托 Java 生成矩阵。"
+  [{:keys [x y scale-x scale-y rotation]
+    :or {x 0.0 y 0.0 scale-x 1.0 scale-y 1.0 rotation 0.0}}]
+  (KMath/mat2dCompose
+    (float x) (float y)
+    (float scale-x) (float scale-y)
+    (float rotation)))
+
+(defn layer-transform
+  "计算图层局部坐标系 → 世界坐标系的仿射变换矩阵。
+   layer-path - 图层在层级中的索引路径（如 [0 1]）
+   layers     - 顶层图层列表
+   返回 float-array 长度 6，若路径无效则返回单位矩阵。"
+  [layer-path layers]
+  (loop [remaining-path layer-path
+         current-matrix identity-matrix
+         current-layers layers]
+    (if-let [idx (first remaining-path)]
+      (let [current-layer (nth current-layers idx)
+            local-matrix  (local-transform current-layer)
+            world-matrix  (KMath/mat2dMul current-matrix local-matrix)]
+        (if-let [rest-path (seq (rest remaining-path))]
+          (recur rest-path world-matrix (:layers current-layer))
+          world-matrix))
+      current-matrix)))
+
+(defn layer-transform-inverse
+  "计算图层局部坐标系 → 世界坐标系的仿射变换矩阵的逆矩阵。
+   path - 图层在层级中的索引路径（如 [0 1]）
+   layers     - 顶层图层列表
+   返回 float-array 长度 6，若矩阵不可逆则返回 nil。"
+  [layers path]
+  (KMath/mat2dInv (layer-transform path layers)))
+
+(defn parent-transform
+  "计算当前图层的父级世界变换矩阵。
+   path - 当前图层在层级中的索引路径
+   layers     - 顶层图层列表
+   返回 float-array 长度 6，若当前图层为根级图层（无父级）则返回 nil。"
+  [layers path]
+  (let [parent-path (path/parent path)]
+    (if (seq parent-path)
+      (layer-transform parent-path layers)
+      identity-matrix)))
+
 
 (defn compose-transforms
   "递归预计算图层树的变换矩阵，把每个图层的局部变换合成为绝对变换。
@@ -28,7 +77,7 @@
     (transform layer :viewport viewport-matrix)"
   ([layer & {:keys [viewport]}]
    (letfn [(transform-layer [layer parent-transform]
-             (let [local-transform (util/compose-local-transform layer)
+             (let [local-transform (local-transform layer)
                    world-transform (KMath/mat2dMul parent-transform local-transform)
                    processed (assoc layer :transform world-transform)]
                (if (group/group? layer)
@@ -37,4 +86,4 @@
                  processed)))]
      (if-let [viewport-transform viewport]
        (transform-layer layer viewport-transform)
-       (transform-layer layer util/identity-matrix)))))
+       (transform-layer layer identity-matrix)))))
