@@ -2,6 +2,8 @@ package top.kzre.krro.canvas.core.layer.render;
 
 import top.kzre.krro.util.tile.TiledCanvas;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * 可下载瓦片：能把渲染后端的内容回写到目标画布。
  *
@@ -38,5 +40,5 @@ public interface DownloadableTile {
      * @param tx     目标格 x 坐标
      * @param ty     目标格 y 坐标
      */
-    void downloadTo(TiledCanvas target, int tx, int ty);
+    CompletableFuture<Void> downloadTo(TiledCanvas target, int tx, int ty);
 }

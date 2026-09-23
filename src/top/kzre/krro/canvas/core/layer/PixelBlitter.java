@@ -169,6 +169,12 @@ public final class PixelBlitter {
             if (matrix2d == null)   throw new IllegalStateException("matrix2d must not be null");
             if (dirtyTiles == null) throw new IllegalStateException("dirtyTiles must not be null");
             if (mask == null)       throw new IllegalStateException("mask must not be null");
+            if (dst.getChannels() != 4){
+                throw new IllegalStateException("dst.getChannels() != 4, PixelBlitter only works on RGBA channels");
+            }
+            if (src.getChannels() != 4){
+                throw new IllegalStateException("src.getChannels() != 4, PixelBlitter only works on RGBA channels");
+            }
             return new BlitterRequest(this);
         }
     }

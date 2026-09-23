@@ -17,22 +17,25 @@
    [top.kzre.krro.canvas.core.layer.group :as group]
    [top.kzre.krro.canvas.core.layer.render.batch :as batch]
    [top.kzre.krro.canvas.core.layer.render.composite :as composite]
+   [top.kzre.krro.canvas.core.layer.render.download :as download]
    [top.kzre.krro.canvas.core.layer.render.merged :as merged]
    [top.kzre.krro.core.util.promise :as promise])
   (:import
    (top.kzre.krro.util.tile TiledCanvas)))
 
-;; 默认逐个合成图层
+
 (defmethod batch/render-batch :default
-  [_ backdrop layers opts]
-  (reduce
-    (fn [p layer]
-      (promise/then p
-                    (fn [^TiledCanvas c]
-                      ;; composite 原地写 c，返回 c
-                      (composite/composite-layer layer c opts))))
-    (promise/resolved backdrop)
-    layers)) ; 成功返回同一 canvas
+  [_ ^TiledCanvas backdrop layers opts]
+  (-> (download/download! backdrop)
+      (promise/then
+        (fn [^TiledCanvas c]
+          (reduce
+            (fn [p layer]
+              (promise/then p
+                            (fn [^TiledCanvas c]
+                              (composite/composite-layer layer c opts))))
+            (promise/resolved c)
+            layers)))))
 
 
 
