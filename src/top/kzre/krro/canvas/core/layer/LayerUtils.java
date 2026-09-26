@@ -3,6 +3,7 @@ package top.kzre.krro.canvas.core.layer;
 import top.kzre.krro.util.math.KMath;
 import top.kzre.krro.util.tile.TiledCanvas;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -95,6 +96,13 @@ public final class LayerUtils {
             }
         }
         return result;
+    }
+
+    public static Set<Long> transformTile(
+            Long tileKey,
+            int tileSize,
+            float[] mat2d) {
+        return transformTiles(Collections.singleton(tileKey), tileSize, mat2d);
     }
 
     public static Set<Long> transformTiles(

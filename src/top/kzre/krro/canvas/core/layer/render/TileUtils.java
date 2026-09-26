@@ -65,11 +65,11 @@ public final class TileUtils {
             TiledCanvas src, TiledCanvas dst) {
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (long key : src.getTiles()) {
-            int tx = TiledCanvas.unpackTx(key);
-            int ty = TiledCanvas.unpackTy(key);
-            Tile tile = src.getTile(tx, ty);
+            Tile tile = src.getTile(key);
             if (tile == null) continue;
 
+            int tx = TiledCanvas.unpackTx(key);
+            int ty = TiledCanvas.unpackTy(key);
             DownloadableTile dl = tile.queryData(DownloadableTile.class);
             if (dl != null) {
                 futures.add(dl.downloadTo(dst, tx, ty));

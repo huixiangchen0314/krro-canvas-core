@@ -27,7 +27,7 @@
 (def move-layer util/move-layer)
 (def parent-container util/parent-container)
 
-(defn render-layers!
+(defn ^:deprecated render-layers!
   "渲染图层树到目标画布（预乘视口变换）。
 
    layers      : 根图层列表（已预处理）
@@ -90,7 +90,7 @@
                 :tile-size     tile-size
                 :viewport-w    view-width
                 :viewport-h    view-height
-                :dirty-tiles   image-clipped-dirty-tiles)]
+                :dirty-tiles   (set image-clipped-dirty-tiles))]
 
     (-> (profile
           {:id :render-layers-pass}

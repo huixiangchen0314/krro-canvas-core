@@ -21,7 +21,8 @@
    [top.kzre.krro.canvas.core.layer.render.merged :as merged]
    [top.kzre.krro.core.util.promise :as promise])
   (:import
-   (top.kzre.krro.util.tile TiledCanvas)))
+    (java.util Set)
+    (top.kzre.krro.util.tile TiledCanvas)))
 
 
 (defmethod batch/render-batch :default
@@ -99,22 +100,21 @@
      :tile-size   TiledCanvas 瓦片大小（必需）
      :view-width  视口宽度（像素）
      :view-height  视口高度（像素）
-     :view-matrix 视口仿射变换矩阵
-     :backend     默认后端（:cpu / :gl / :default），缺省 :default
      其他键透传给 render-batch / render-layer!
 
    返回的 Promise 解析为渲染完成的 Canvas，所有权转移给调用方。
-   所有中间画布在成功/失败路径下均由内部清理。
-
-   注意：顶层 GroupBatch 的 group 为 nil；merged/make-merged-layer
-   必须能处理 nil 组，否则需要在调用处传一个占位组记录。"
-  [layers opts]
-  (let [{:keys [tile-size]} opts
-        _       (when-not tile-size
-                  (throw (ex-info "render: opts must contain :tile-size"
-                                  {:opts opts})))
-        batches (build-batch layers opts)
+   所有中间画布在成功/失败路径下均由内部清理。"
+  [layers {:keys [dirty-tiles tile-size
+                  view-width view-height]
+           :as opts}]
+  {:pre [(vector? layers)
+         (or (set? dirty-tiles) (instance? Set dirty-tiles))
+         (int? tile-size)
+         (number? view-width)
+         (number? view-height)]}
+  (let [batches (build-batch layers opts)
         top     (batch/group-batch (merged/default-layer-attrs) batches)
+        ;; TODO 颜色空间
         canvas  (TiledCanvas. tile-size)]
     (try
       (-> (batch/render top canvas opts)
@@ -124,8 +124,8 @@
               ;; 原始引用在这里统一释放
               (.clear canvas)
               (if e
-                (throw e)                    ; 失败：清理后重抛
-                (:canvas layer)))))          ; 成功：返回结果画布
+                (throw e)                                   ;; 失败：清理后重抛
+                (.keepTiles ^TiledCanvas (:canvas layer) dirty-tiles)))))  ; 成功：返回结果画布
       (catch Throwable e
         ;; batch/render 同步抛（罕见）时，初始画布也要释放
         (.clear canvas)

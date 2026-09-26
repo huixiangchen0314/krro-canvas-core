@@ -71,6 +71,7 @@
       (when-not (:failed s)
         (if (compare-and-set! t s (assoc s :failed true :canvases []))
           (run! (fn [^TiledCanvas c]
+                  ;; 注意，不能用close, close 并非幂等
                   (try (.clear c)
                        (catch Throwable _ nil)))
                 (:canvases s))

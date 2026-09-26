@@ -87,16 +87,18 @@
 (defn- merge-into-backdrop
   "把已解析图层合并进 backdrop，随后清理这些图层的画布。
 
-   merge-fn 契约：通常原地写 backdrop 并返回它（此时 merged == backdrop，
-   已在 tracker 中，本次 track! 是冗余但幂等的）；也允许返回新画布
-   （新画布所有权转移给调用方，本次 track! 完成登记）。
+   merge-fn 契约：必须原地写 backdrop，返回同一个对象。
 
-   返回 Promise<merged-canvas>。"
-  [layers ^TiledCanvas backdrop opts merge-fn track!]
+   返回 Promise<merged-canvas>，等于入参 backdrop。"
+  [layers ^TiledCanvas backdrop opts merge-fn]
   (-> (merge-fn layers backdrop opts)
       (promise/fmap
         (fn [merged]
-          (track! merged)
+          (when-not (identical? merged backdrop)
+            (throw (ex-info
+                     "merge-fn must write in place and return the same backdrop"
+                     {:backdrop backdrop
+                      :returned merged})))
           (clear-layers! layers)
           merged))))
 
@@ -114,13 +116,13 @@
    两种情况下 layer.canvas 都是状态里的 backdrop 本身
    （已由 new-canvas-fn 或 merge-into-backdrop 登记）。
    新状态里的 backdrop 由 new-canvas-fn 创建并登记。"
-  [batch [layer-promises ^TiledCanvas backdrop] opts merge-fn new-canvas-fn track!]
+  [batch [layer-promises ^TiledCanvas backdrop] opts merge-fn new-canvas-fn ]
   (if (seq layer-promises)
     (let [rendered
           (-> (promise/all layer-promises)
               (promise/then
                 (fn [layers]
-                  (merge-into-backdrop layers backdrop opts merge-fn track!)))
+                  (merge-into-backdrop layers backdrop opts merge-fn )))
               (promise/then
                 (fn [new-backdrop]
                   ;; render 原地写 new-backdrop，layer.canvas == new-backdrop
@@ -136,7 +138,7 @@
    render 原地写它并作为 layer.canvas 返回；
    它会在后续 merge-into-backdrop 或 finalize 的 clear-layers! 中清理。
    此处不 track——因为 layer.canvas 就是 empty-backdrop，已经在 tracker 里。"
-  [batch [layer-promises backdrop] opts _merge-fn new-canvas-fn _track!]
+  [batch [layer-promises backdrop] opts _merge-fn new-canvas-fn ]
   (let [empty-backdrop (new-canvas-fn)
         layer-p        (render batch empty-backdrop opts)]
     [(conj layer-promises layer-p) backdrop]))
@@ -158,15 +160,15 @@
   IBatch
   (render [_ backdrop-canvas opts]
     (let [merge-fn  merge/*merge-layers*
-          tile-size (.getTileSize backdrop-canvas)
-
+          tile-size (.getTileSize ^TiledCanvas backdrop-canvas)
+          default-pixels (.getDefaultPixel  ^TiledCanvas backdrop-canvas)
           ;; canvas-tracker 登记 GroupBatch 拥有的全部画布：
           ;;   1. 入参 backdrop-canvas（所有权随调用转移）
           ;;   2. 所有 new-canvas-fn 创建的空白画布
           ;;   3. merge-fn 返回的画布（merge-into-backdrop 内登记）
           tracker   (canvas-tracker/tracker)
           track!    #(canvas-tracker/track! tracker %)
-          new-canvas-fn #(track! (TiledCanvas. tile-size))
+          new-canvas-fn #(track! (TiledCanvas. tile-size default-pixels))
 
           step (fn [pacc batch]
                  (promise/fmap
@@ -175,12 +177,10 @@
                      ((if (instance? BackendBatch batch)
                         render-backend-step
                         render-group-step)
-                      batch state opts merge-fn new-canvas-fn track!))))
+                      batch state opts merge-fn new-canvas-fn ))))
 
           finalize
           (fn [[layer-promises ^TiledCanvas backdrop]]
-            ;; 先把累积的 Promise 解析成实际图层再 merge，
-            ;; 否则 merge-fn 收到的是 Promise 向量，clear-layers! 也会拿不到 :canvas
             (-> (promise/all layer-promises)
                 (promise/then
                   (fn [layers]
@@ -191,9 +191,6 @@
                               (clear-layers! layers)
                               (merged/make-merged-layer group merged-canvas)
                               (catch Throwable e
-                                ;; 失败：清理输出画布。若 merged-canvas == backdrop，
-                                ;; 它已在 tracker 里；下面的 fail! 会再清一次（幂等无害）。
-                                ;; 清理输出画布——若清理本身抛异常，吞掉不遮蔽原始异常
                                 (try (.clear ^TiledCanvas merged-canvas)
                                      (catch Throwable _ nil))
                                 (throw e))))))))))]
