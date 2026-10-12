@@ -159,7 +159,9 @@
   [group batches]
   IBatch
   (render [_ backdrop-canvas opts]
-    (let [merge-fn  merge/*merge-layers*
+    (let [
+          ;; 参数提供，或者使用全局合并函数函数
+          merge-fn  (:merge-fn opts merge/*merge-layers*)
           tile-size (.getTileSize ^TiledCanvas backdrop-canvas)
           default-pixels (.getDefaultPixel  ^TiledCanvas backdrop-canvas)
           ;; canvas-tracker 登记 GroupBatch 拥有的全部画布：
