@@ -1,12 +1,14 @@
 (ns top.kzre.krro.canvas.core.layer.render.merge
   (:require
-    [top.kzre.krro.canvas.core.layer.util :as util]
-    [top.kzre.krro.canvas.core.layer.render.download :as download]
-    [top.kzre.krro.core.util.promise :as promise])
+   [taoensso.timbre :as log]
+   [top.kzre.krro.canvas.core.layer.render.download :as download]
+   [top.kzre.krro.canvas.core.layer.util :as util]
+   [top.kzre.krro.core.util.promise :as promise])
   (:import
-    (top.kzre.krro.canvas.core.layer PixelBlitter)
-    (top.kzre.krro.canvas.core.layer PixelBlitter$BlitterRequest)
-    (top.kzre.krro.util.tile TiledCanvas)))
+   (top.kzre.krro.canvas.core.layer PixelBlitter)
+   (top.kzre.krro.canvas.core.layer PixelBlitter$BlitterRequest)
+   [top.kzre.krro.util.math KMath]
+   (top.kzre.krro.util.tile TiledCanvas)))
 
 ;; ═══════════════════════════════════════════════
 ;; 单图层 blit
@@ -66,20 +68,30 @@
 ;; ═══════════════════════════════════════════════
 
 (defonce ^:private default-merge-layers-fn*
-         (fn [layers ^TiledCanvas canvas
+         (fn [layers ^TiledCanvas backdrop
               {:keys [view-width view-height dirty-tiles
                       image-aabb subpixel?]
                :or   {subpixel? false}}]
-           ;; CPU blit 要求所有画布的瓦片都是 CPU 侧的——
-           ;; 上游 GL 合成产出的画布携带 GLTileData，必须先下载。
-           (-> (download-all! layers canvas)
-               (promise/fmap
-                 (fn [_]
-                   (doseq [layer layers]
-                     (blit-layer! layer canvas
-                                  view-width view-height
-                                  dirty-tiles image-aabb subpixel?))
-                   canvas)))))
+            (if (seq layers)
+              (if (and (.isEmpty (.getTiles backdrop))
+                       (= (count layers) 1)
+                       (KMath/mat2dIsIdentity (:transform (nth layers 0))))
+                ;; 快速路径, backdrop是空的，
+                ;; 并且只有单个图层，且图层变换是标准变换，结果等于图层画布
+                (promise/resolved
+                  (.keepTiles (.mergeCanvas backdrop (:canvas (nth layers 0)))
+                              dirty-tiles))
+                ;; CPU blit 要求所有画布的瓦片都是 CPU 侧的——
+                ;; 上游 GL 合成产出的画布携带 GLTileData，必须先下载。
+                (-> (download-all! layers backdrop)
+                    (promise/fmap
+                      (fn [_]
+                        (doseq [layer layers]
+                          (blit-layer! layer backdrop
+                                       view-width view-height
+                                       dirty-tiles image-aabb subpixel?))
+                        backdrop))))
+              (promise/resolved backdrop))))
 
 (defn default-merge-layers-fn [] default-merge-layers-fn*)
 
